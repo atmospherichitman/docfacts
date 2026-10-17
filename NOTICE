@@ -1,0 +1,48 @@
+DocFacts
+Copyright (c) 2026 <COPYRIGHT HOLDER — PENDING OWNER CONFIRMATION>
+
+This product is licensed under the MIT License. See LICENSE.
+
+----------------------------------------------------------------------
+Origin and attribution
+----------------------------------------------------------------------
+
+DocFacts was written inside a private fork of:
+
+    Conway-Research/automaton
+    https://github.com/Conway-Research/automaton
+    MIT License, Copyright (c) 2026 Conway
+
+**No code from that project is included in this package.** The four source
+modules distributed here were written from scratch for DocFacts:
+
+    spec.ts       feature taxonomy and extraction
+    infer.ts      inferring a reference document's interface
+    check.ts      comparing a draft against a reference
+    docverify.ts  the command-line interface
+
+Each was introduced by a commit authored by this project's author, and
+`git log --follow --find-copies-harder` shows no rename, copy or derivation
+from any upstream file. No upstream module is imported: the only imports are
+Node's own `node:fs` and `node:path`, plus the four files above importing one
+another.
+
+This notice records that relationship anyway. The code is independent; the
+project it grew up in is not this one, and saying so costs nothing and is the
+honest thing to do.
+
+----------------------------------------------------------------------
+Third-party code and assets
+----------------------------------------------------------------------
+
+None.
+
+  - Runtime dependencies:        none
+  - Bundled or vendored code:    none
+  - Fonts, icons, images:        none (the CLI is text only)
+  - Build-time dependency:       TypeScript (Apache-2.0), used to compile
+                                 and not distributed in this package
+
+The published archive contains four compiled JavaScript files, four type
+declaration files, and documentation. It carries no third-party code, so no
+third-party notice is required.

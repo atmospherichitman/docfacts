@@ -1,0 +1,27 @@
+# Copy to .github/workflows/docs.yml
+name: Documentation
+on:
+  pull_request:
+    paths: ["docs/**"]
+
+# Read-only. Checking documentation needs nothing more, and a write-capable
+# token is a token that can be abused.
+permissions:
+  contents: read
+
+jobs:
+  docfacts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # Start non-blocking. Watch what it says about your documentation for a
+      # week before you let it fail a merge.
+      - uses: docfacts/docfacts@v0
+        with:
+          reference: docs/api-spec.md
+          draft: docs/getting-started.md
+          fail-on-findings: false

@@ -1,0 +1,63 @@
+# A GitHub Action wrapper for docfacts.
+#
+# This is the one promotional asset worth building, because it is not
+# promotional: it puts the tool where the problem happens -- the moment a
+# documentation pull request is opened -- and it is useful to someone who
+# never buys anything.
+#
+# NOT PUBLISHED. Publishing an action means tagging a public repository,
+# which is a deployment decision for the owner.
+name: "DocFacts"
+description: "Check a document against the reference it was written from. Runs nothing, sends nothing."
+author: "DocFacts"
+branding:
+  icon: "check-circle"
+  color: "blue"
+
+inputs:
+  reference:
+    description: "Path to the source of truth the draft was written from."
+    required: true
+  draft:
+    description: "Path to the document to check."
+    required: true
+  tool:
+    description: "The command the reference documents, if the guess is wrong."
+    required: false
+  fail-on-findings:
+    description: >
+      Fail the job when findings are reported. Set to false to report
+      without blocking, which is the right setting while you see how noisy
+      it is on your documentation.
+    required: false
+    default: "true"
+
+outputs:
+  findings:
+    description: "Number of findings reported."
+    value: ${{ steps.run.outputs.findings }}
+
+runs:
+  using: "composite"
+  steps:
+    - id: run
+      shell: bash
+      run: |
+        set -o pipefail
+        args=(--reference "${{ inputs.reference }}" --draft "${{ inputs.draft }}")
+        if [ -n "${{ inputs.tool }}" ]; then args+=(--tool "${{ inputs.tool }}"); fi
+
+        # Human-readable into the log, JSON for the count. Two runs rather
+        # than one, because parsing a report for a number is how a report
+        # ends up shaped by its parser.
+        npx --yes docfacts@0.1.0 "${args[@]}" || true
+        npx --yes docfacts@0.1.0 "${args[@]}" --json > docfacts.json || true
+
+        count=$(node -e "try{const d=require('./docfacts.json');process.stdout.write(String(d.findings.filter(f=>f.level==='finding').length))}catch(e){process.stdout.write('0')}")
+        echo "findings=$count" >> "$GITHUB_OUTPUT"
+        echo "DocFacts reported $count finding(s)." >> "$GITHUB_STEP_SUMMARY"
+
+        if [ "${{ inputs.fail-on-findings }}" = "true" ] && [ "$count" != "0" ]; then
+          echo "::error::DocFacts reported $count finding(s). See the log above."
+          exit 1
+        fi
