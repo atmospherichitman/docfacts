@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DocFacts — Copyright (c) 2026 Antwon Randolph. MIT licensed; see LICENSE.
 /**
  * docverify — check a draft document against the reference it was written from.
  *

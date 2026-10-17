@@ -1,3 +1,4 @@
+// DocFacts — Copyright (c) 2026 Antwon Randolph. MIT licensed; see LICENSE.
 /**
  * What a specification actually says about a feature.
  *

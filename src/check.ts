@@ -1,3 +1,4 @@
+// DocFacts — Copyright (c) 2026 Antwon Randolph. MIT licensed; see LICENSE.
 /**
  * Compare a draft against a reference and say what the reference does not
  * support.
