@@ -2,18 +2,47 @@
   "name": "docfacts",
   "version": "0.1.0",
   "description": "Check a technical document against the reference it was written from. Reports commands, flags, variables, exit codes and endpoints the reference does not support. Runs nothing, sends nothing.",
-  "keywords": ["documentation", "technical-writing", "verification", "fact-checking", "hallucination", "cli", "docs-as-code"],
+  "keywords": [
+    "documentation",
+    "technical-writing",
+    "verification",
+    "fact-checking",
+    "hallucination",
+    "cli",
+    "docs-as-code"
+  ],
+  "author": "Antwon Randolph",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/atmospherichitman/docfacts.git"
+  },
+  "homepage": "https://github.com/atmospherichitman/docfacts#readme",
+  "bugs": {
+    "url": "https://github.com/atmospherichitman/docfacts/issues"
+  },
   "type": "module",
-  "engines": { "node": ">=20.0.0" },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "bin": {
     "docfacts": "dist/docverify.js",
     "docverify": "dist/docverify.js"
   },
   "exports": {
-    ".": { "types": "./dist/check.d.ts", "import": "./dist/check.js" }
+    ".": {
+      "types": "./dist/check.d.ts",
+      "import": "./dist/check.js"
+    }
   },
-  "files": ["dist/", "README.md", "PRIVACY.md", "CHANGELOG.md", "LICENSE", "NOTICE"],
+  "files": [
+    "dist/",
+    "README.md",
+    "PRIVACY.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "NOTICE"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",

@@ -20,7 +20,7 @@ jobs:
 
       # Start non-blocking. Watch what it says about your documentation for a
       # week before you let it fail a merge.
-      - uses: docfacts/docfacts@v0
+      - uses: atmospherichitman/docfacts@v0
         with:
           reference: docs/api-spec.md
           draft: docs/getting-started.md
