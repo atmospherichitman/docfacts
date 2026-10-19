@@ -5,8 +5,31 @@
 # documentation pull request is opened -- and it is useful to someone who
 # never buys anything.
 #
-# NOT PUBLISHED. Publishing an action means tagging a public repository,
-# which is a deployment decision for the owner.
+# ── Why this file is written the way it is ──────────────────────────────
+#
+# The first version of this action interpolated `${{ inputs.reference }}`
+# straight into a bash script. GitHub substitutes `${{ }}` as *text* before
+# bash ever parses the script, so an input containing a quote and a semicolon
+# stops being a path and becomes a command. That is the classic Actions
+# script injection, and it is worst in exactly the situation this action is
+# for: a workflow handling a pull request.
+#
+# So: every input reaches bash through `env:` and is read as `"$DF_..."`.
+# Nothing untrusted is ever part of the script's source text. The only `${{ }}`
+# below are in `env:` and `outputs:` blocks, which are YAML, not shell.
+#
+# The same version also had three fail-open bugs, which matter more than they
+# look. `|| true` after the CLI discarded its exit code, so a missing file --
+# which the CLI reports as exit 2 -- became "0 findings" and a green check.
+# The count was then parsed with a `catch` that returned `'0'`, so an
+# unparseable report also became "0 findings". A documentation check that
+# reports "all clear" when it never ran is worse than no check at all, because
+# someone trusts it.
+#
+# Everything here therefore fails closed: if the report is missing, empty,
+# malformed, or produced by a version other than the pinned one, the step
+# fails and says why. "No findings" is only ever reported when the tool
+# actually ran and actually found none.
 name: "DocFacts"
 description: "Check a document against the reference it was written from. Runs nothing, sends nothing."
 author: "DocFacts"
@@ -26,38 +49,270 @@ inputs:
     required: false
   fail-on-findings:
     description: >
-      Fail the job when findings are reported. Set to false to report
+      Fail the job when findings are reported. Set to "false" to report
       without blocking, which is the right setting while you see how noisy
-      it is on your documentation.
+      it is on your documentation. Must be exactly "true" or "false": a
+      value this action does not understand is a usage error, not a reason
+      to guess. Input and usage errors fail the job either way.
     required: false
     default: "true"
+  version:
+    description: >
+      The docfacts version to run. Pinned by default, because an action that
+      silently follows the latest release is an action whose behaviour can
+      change under you.
+    required: false
+    default: "0.1.0"
 
 outputs:
   findings:
-    description: "Number of findings reported."
+    description: "Number of findings reported. Only set when the check actually ran."
     value: ${{ steps.run.outputs.findings }}
+  report:
+    description: "Path to the JSON report, outside the checkout."
+    value: ${{ steps.run.outputs.report }}
 
 runs:
   using: "composite"
   steps:
     - id: run
       shell: bash
+      # The one safe way to hand a workflow input to a shell. These become
+      # environment variables; they never become script source.
+      env:
+        DF_REFERENCE: ${{ inputs.reference }}
+        DF_DRAFT: ${{ inputs.draft }}
+        DF_TOOL: ${{ inputs.tool }}
+        DF_FAIL_ON_FINDINGS: ${{ inputs.fail-on-findings }}
+        DF_VERSION: ${{ inputs.version }}
       run: |
-        set -o pipefail
-        args=(--reference "${{ inputs.reference }}" --draft "${{ inputs.draft }}")
-        if [ -n "${{ inputs.tool }}" ]; then args+=(--tool "${{ inputs.tool }}"); fi
+        set -euo pipefail
 
-        # Human-readable into the log, JSON for the count. Two runs rather
-        # than one, because parsing a report for a number is how a report
-        # ends up shaped by its parser.
-        npx --yes docfacts@0.1.0 "${args[@]}" || true
-        npx --yes docfacts@0.1.0 "${args[@]}" --json > docfacts.json || true
+        # Exit 2 for anything that is not a genuine result. Kept distinct from
+        # exit 1 (findings) throughout: `fail-on-findings` may silence
+        # findings, and must never silence a broken run.
+        usage_error() {
+          echo "::error title=DocFacts usage error::$1"
+          {
+            echo "### DocFacts could not run"
+            echo
+            echo "$1"
+            echo
+            echo "This is an input or usage error, not a documentation finding."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 2
+        }
 
-        count=$(node -e "try{const d=require('./docfacts.json');process.stdout.write(String(d.findings.filter(f=>f.level==='finding').length))}catch(e){process.stdout.write('0')}")
+        # ── validate the inputs before anything touches them ─────────────
+        #
+        # A leading dash is the important one: a path of "--help" would stop
+        # being a path and become a flag, which is argument injection even
+        # with the shell quoting correct. A ".." segment is blocked because
+        # this action's job is to read files from the checkout.
+        check_path() {
+          local label="$1" value="$2"
+          [ -n "$value" ] || usage_error "input '$label' is empty."
+          case "$value" in
+            -*) usage_error "input '$label' starts with '-', which would be read as a flag rather than a path." ;;
+            ..|../*|*/../*|*/..) usage_error "input '$label' contains a '..' path segment; give a path inside the checkout." ;;
+          esac
+          [ -e "$value" ] || usage_error "input '$label' points at '$value', which does not exist. Did the checkout step run?"
+          [ -f "$value" ] || usage_error "input '$label' points at '$value', which is not a regular file."
+          [ -r "$value" ] || usage_error "input '$label' points at '$value', which cannot be read."
+        }
+
+        check_path reference "$DF_REFERENCE"
+        check_path draft "$DF_DRAFT"
+
+        # Not executed by the CLI -- it is matched as a string -- but a
+        # leading dash would still turn it into a flag.
+        case "${DF_TOOL:-}" in
+          -*) usage_error "input 'tool' starts with '-', which would be read as a flag." ;;
+        esac
+
+        # A typo like "False" must not quietly disable the gate. That is the
+        # fail-open shape this rewrite exists to remove.
+        case "$DF_FAIL_ON_FINDINGS" in
+          true|false) ;;
+          *) usage_error "input 'fail-on-findings' must be exactly \"true\" or \"false\", not \"$DF_FAIL_ON_FINDINGS\"." ;;
+        esac
+
+        # The version becomes part of the npm package spec, so it is matched
+        # strictly rather than quoted and hoped for.
+        if ! printf '%s' "$DF_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+          usage_error "input 'version' must be an exact version like \"0.1.0\", not \"$DF_VERSION\"."
+        fi
+
+        # ── run the CLI once ────────────────────────────────────────────
+        #
+        # Once, not twice. The earlier version ran it twice -- human-readable
+        # for the log, JSON for the count -- which doubled the work and made
+        # the two runs able to disagree. The JSON carries everything, so the
+        # log digest is rendered from the report instead.
+        #
+        # The report goes to RUNNER_TEMP, never the checkout: a file written
+        # into the working directory can be committed by a later step or
+        # picked up by a dirty-tree check.
+        report="${RUNNER_TEMP}/docfacts-report.json"
+        digest="${RUNNER_TEMP}/docfacts-digest.md"
+        counter="${RUNNER_TEMP}/docfacts-count.cjs"
+
+        args=(--reference "$DF_REFERENCE" --draft "$DF_DRAFT" --json)
+        if [ -n "${DF_TOOL:-}" ]; then
+          args+=(--tool "$DF_TOOL")
+        fi
+
+        # The exit code is captured, not discarded. `set +e` around just this
+        # call, because exit 1 is a legitimate result here and `set -e` would
+        # abort on it before it could be interpreted.
+        set +e
+        npx --yes "docfacts@${DF_VERSION}" "${args[@]}" > "$report"
+        cli_status=$?
+        set -e
+
+        # 0 = clean, 1 = findings, 2 = input or usage error. Anything else
+        # means something other than the CLI decided the outcome -- npx could
+        # not fetch the package, the runner killed it, a signal. None of those
+        # are "no findings".
+        case "$cli_status" in
+          0|1) ;;
+          2) usage_error "docfacts@${DF_VERSION} rejected its input (exit 2). Check the reference and draft paths." ;;
+          *) usage_error "docfacts@${DF_VERSION} exited with status $cli_status, which is neither a result nor a usage error. The package may not have installed." ;;
+        esac
+
+        # ── interpret the report, failing closed ────────────────────────
+        #
+        # Written to a file and run, rather than passed to `node -e`, so that
+        # no value ever becomes part of a script's source text. The script
+        # reads what it needs from the environment.
+        cat > "$counter" <<'NODE'
+        'use strict';
+        const fs = require('node:fs');
+
+        function fail(message) {
+          process.stderr.write('docfacts-action: ' + message + '\n');
+          // Exit 2: not a result. Never zero findings.
+          process.exit(2);
+        }
+
+        const reportPath = process.env.DF_REPORT;
+        const expected = process.env.DF_VERSION;
+        const cliStatus = Number(process.env.DF_CLI_STATUS);
+
+        if (!reportPath) fail('internal error: DF_REPORT was not set.');
+
+        let raw;
+        try {
+          raw = fs.readFileSync(reportPath, 'utf8');
+        } catch (err) {
+          fail('the report at ' + reportPath + ' could not be read (' + err.code + '). Treating this as a failure, not as zero findings.');
+        }
+
+        if (raw.trim() === '') {
+          fail('the report is empty. Treating this as a failure, not as zero findings.');
+        }
+
+        let data;
+        try {
+          data = JSON.parse(raw);
+        } catch (err) {
+          fail('the report is not valid JSON (' + err.message + '). Treating this as a failure, not as zero findings.');
+        }
+
+        if (data === null || typeof data !== 'object' || Array.isArray(data)) {
+          fail('the report is not a JSON object. Treating this as a failure, not as zero findings.');
+        }
+        if (!Array.isArray(data.findings)) {
+          fail('the report has no findings array. Treating this as a failure, not as zero findings.');
+        }
+        if (typeof data.version !== 'string') {
+          fail('the report does not say which version produced it, so it cannot be trusted.');
+        }
+
+        // The pinned version is only a real pin if the thing that ran is
+        // actually that version. npx resolving to something else -- a cached
+        // copy, a redirected registry -- would otherwise go unnoticed.
+        if (data.version !== expected) {
+          fail('version mismatch: pinned docfacts@' + expected + ' but the report was produced by ' + data.version + '.');
+        }
+
+        const findings = data.findings.filter(
+          (f) => f !== null && typeof f === 'object' && f.level === 'finding',
+        );
+        const notes = data.findings.filter(
+          (f) => f !== null && typeof f === 'object' && f.level === 'note',
+        );
+
+        // Cross-check the count against the exit code. If these disagree, the
+        // installed package does not behave the way this action expects, and
+        // guessing which one is right would defeat the point of checking.
+        if (cliStatus === 0 && findings.length !== 0) {
+          fail('docfacts exited 0 but reported ' + findings.length + ' finding(s); the installed package does not behave as this action expects.');
+        }
+        if (cliStatus === 1 && findings.length === 0) {
+          fail('docfacts exited 1 but reported no findings; the installed package does not behave as this action expects.');
+        }
+
+        // A digest for the log, rendered from the report rather than from a
+        // second run of the tool.
+        const lines = [];
+        lines.push('### DocFacts');
+        lines.push('');
+        lines.push(
+          findings.length === 0
+            ? 'No findings. ' + notes.length + ' note(s).'
+            : findings.length + ' finding(s), ' + notes.length + ' note(s).',
+        );
+        if (findings.length > 0) {
+          lines.push('');
+          lines.push('| Confidence | Token | What |');
+          lines.push('|---|---|---|');
+          const cell = (s) => String(s === undefined ? '' : s).replace(/\|/g, '\\|').replace(/\r?\n/g, ' ').slice(0, 200);
+          for (const f of findings.slice(0, 50)) {
+            lines.push('| ' + cell(f.confidence) + ' | `' + cell(f.token) + '` | ' + cell(f.what) + ' |');
+          }
+          if (findings.length > 50) {
+            lines.push('');
+            lines.push('…and ' + (findings.length - 50) + ' more; see the JSON report.');
+          }
+        }
+        lines.push('');
+        lines.push('A clean result is not a guarantee of correctness. DocFacts checks a draft against one reference; it cannot know what the reference leaves out.');
+        lines.push('');
+
+        try {
+          fs.writeFileSync(process.env.DF_DIGEST, lines.join('\n'), 'utf8');
+        } catch (err) {
+          fail('the digest could not be written (' + err.code + ').');
+        }
+
+        process.stdout.write(String(findings.length));
+        NODE
+
+        if ! count=$(
+          DF_REPORT="$report" \
+          DF_DIGEST="$digest" \
+          DF_CLI_STATUS="$cli_status" \
+          node "$counter"
+        ); then
+          usage_error "the docfacts report could not be interpreted; see the log above. Reported as a failure rather than as zero findings."
+        fi
+
+        # ── report ──────────────────────────────────────────────────────
         echo "findings=$count" >> "$GITHUB_OUTPUT"
-        echo "DocFacts reported $count finding(s)." >> "$GITHUB_STEP_SUMMARY"
+        echo "report=$report" >> "$GITHUB_OUTPUT"
+        cat "$digest" >> "$GITHUB_STEP_SUMMARY"
 
-        if [ "${{ inputs.fail-on-findings }}" = "true" ] && [ "$count" != "0" ]; then
-          echo "::error::DocFacts reported $count finding(s). See the log above."
+        if [ "$count" = "0" ]; then
+          echo "DocFacts reported no findings."
+          exit 0
+        fi
+
+        # Findings, and only findings, are what fail-on-findings governs.
+        if [ "$DF_FAIL_ON_FINDINGS" = "true" ]; then
+          echo "::error title=DocFacts::$count finding(s). See the job summary."
           exit 1
         fi
+
+        echo "::warning title=DocFacts::$count finding(s). Not failing the job because fail-on-findings is false."
+        exit 0

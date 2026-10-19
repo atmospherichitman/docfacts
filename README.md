@@ -57,6 +57,48 @@ so it drops into CI without a wrapper.
 
 The build fails when the guide claims something the spec does not support.
 
+### As a GitHub Action
+
+```yaml
+name: Docs
+on: pull_request          # not pull_request_target — see below
+
+permissions:
+  contents: read          # all this needs; a write token is a liability
+
+jobs:
+  docfacts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: atmospherichitman/docfacts@v0.1.0
+        with:
+          reference: docs/api-spec.md
+          draft: docs/guide.md
+          # version: "0.1.0"        # pinned by default
+          # fail-on-findings: "false"   # report without blocking
+```
+
+Three things about this are deliberate, and worth keeping if you adapt it:
+
+- **`pull_request`, never `pull_request_target`.** The latter runs with a
+  write-capable token and your secrets available to a pull request's own
+  code. Checking documentation needs neither.
+- **`permissions: contents: read`.** The action reads two files and writes
+  its report outside the checkout. It asks for nothing else.
+- **Paths come from your workflow, not from the pull request.** The action
+  rejects inputs that start with `-` or contain `..`, but the right habit is
+  to name the files yourself rather than take a path from content.
+
+Exit codes are `0` for a clean check, `1` for findings, and `2` for an input
+or usage error. A missing file, an unreadable report, or a version that does
+not match the pin is a `2` and fails the job — `fail-on-findings: "false"`
+silences findings and nothing else. "No findings" is only ever reported when
+the tool actually ran and actually found none.
+
+The step also sets two outputs: `findings` (the count) and `report` (the path
+to the JSON report, for `actions/upload-artifact`).
+
 ## What it reports
 
 | | |
