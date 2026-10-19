@@ -44,37 +44,21 @@ jobs:
       # secret. This guards against the other failure: a file that does not
       # belong in a published directory ending up in one — a note, a backup,
       # an export, an environment file.
+      # The same module the test suite runs, rather than a second statement
+      # of the same policy in grep.
+      #
+      # The previous version of this step was exactly that second statement,
+      # and it refused to deploy the day the worked example gained two radio
+      # buttons: `grep '<input'` cannot tell a radio from a password field,
+      # or see whether either is inside a form. The tests had already been
+      # taught the narrower rule, so they passed while the deployment
+      # failed — two copies of one policy, drifted apart.
+      #
+      # check-site.mjs tokenises the markup and reads attributes, so the
+      # rules can be about what the page does. It needs no dependencies,
+      # which is why this step runs before any install.
       - name: Refuse to deploy anything that is not a static site asset
-        run: |
-          set -euo pipefail
-
-          echo "Files to be deployed:"
-          find site -type f | sort | sed 's/^/  /'
-          echo
-
-          # Allowlist by extension. Anything else is a deliberate decision
-          # and should be made here, in a diff, rather than by dropping a
-          # file into the directory.
-          unexpected=$(find site -type f ! -regex '.*\.\(html\|css\|svg\|png\|jpg\|jpeg\|webp\|ico\|woff2\|yml\|txt\)$' || true)
-          if [ -n "$unexpected" ]; then
-            echo "::error::these files are not static site assets:"
-            echo "$unexpected"
-            exit 1
-          fi
-
-          # No executable content, and nothing that reaches a third party.
-          if grep -rniE '<script|googletagmanager|google-analytics|gtag\(|plausible\.io|posthog|mixpanel|hotjar|segment\.(io|com)|fullstory|clarity\.ms' site/; then
-            echo "::error::the site contains a script or a tracker"
-            exit 1
-          fi
-
-          # No way for a visitor to send anything anywhere.
-          if grep -rniE '<form|<input|<textarea|js\.stripe\.com|buy\.stripe\.com|pk_(live|test)_' site/; then
-            echo "::error::the site collects input or carries a payment path"
-            exit 1
-          fi
-
-          echo "Site contents verified."
+        run: node scripts/check-site.mjs site
 
       - uses: actions/configure-pages@v5
 

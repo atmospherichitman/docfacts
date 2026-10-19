@@ -17,6 +17,7 @@
 
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
+import { checkHtml, checkSite, checkText } from "../scripts/check-site.mjs";
 
 const html = fs.readFileSync("site/index.html", "utf-8");
 const statusHtml = fs.readFileSync("site/status.html", "utf-8");
@@ -528,5 +529,51 @@ describe("the worked example is consistent with its own documents", () => {
     expect(visible).not.toMatch(/<script\b/i);
     expect(css).toMatch(/#ex-broken:checked\s*~\s*\.pane-broken/);
     expect(css).toMatch(/#ex-fixed:checked\s*~\s*\.pane-fixed/);
+  });
+});
+
+/**
+ * The deployment guard, run from the test suite.
+ *
+ * `check-site.mjs` is what the Pages workflow runs before publishing. Having
+ * the tests call the same module means a change that would fail the deploy
+ * fails here first, on a pull request, instead of after a merge.
+ *
+ * It also means there is one statement of the policy. There used to be two
+ * — these tests and a grep in the workflow — and they drifted: a worked
+ * example gained two radio buttons, the tests were taught that radios
+ * outside a form are harmless, and the deployment refused the page the
+ * suite had just approved.
+ */
+describe("the deployment guard", () => {
+  it("accepts the site as it stands", () => {
+    const { problems } = checkSite("site");
+    expect(problems, `the deployable site was refused:\n${problems.join("\n")}`).toEqual([]);
+  });
+
+  it("still refuses a form, a payment link and a remote script", () => {
+    // So the check above cannot pass by doing nothing.
+    for (const hostile of [
+      '<form action="https://example.test/x"><input type="text" name="q"></form>',
+      '<a href="https://buy.stripe.com/live_x">Order</a>',
+      '<script src="https://cdn.example.test/analytics.js"></script>',
+      '<input type="file" name="doc">',
+      '<a href="#" onclick="track()">x</a>',
+    ]) {
+      const mutated = html.replace("</body>", `${hostile}</body>`);
+      const found = [
+        ...checkHtml("index.html", mutated),
+        ...checkText("index.html", mutated),
+      ];
+      expect(found.length, `the guard accepted: ${hostile}`).toBeGreaterThan(0);
+    }
+  });
+
+  it("permits the radio switcher the page actually uses", () => {
+    const switcher = html.slice(html.indexOf('<div class="switcher">'), html.indexOf("</section>"));
+    expect(switcher).toMatch(/<input[^>]*type="radio"/);
+    expect(checkHtml("fragment.html", `<!doctype html><html><body>${switcher}</body></html>`)).toEqual(
+      [],
+    );
   });
 });
