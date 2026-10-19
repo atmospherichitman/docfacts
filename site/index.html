@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DocFacts — catch documentation mistakes before your users do</title>
+<meta name="description" content="Compare technical guides against their reference material. Find potentially unsupported commands, configuration options, and contradictions before publishing. Runs locally, sends nothing, no dependencies.">
+<meta name="color-scheme" content="dark">
+<link rel="canonical" href="https://atmospherichitman.github.io/docfacts/">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230a0c0f'/><path d='M9 10h9l5 5v7a2 2 0 0 1-2 2h-12a2 2 0 0 1-2-2v-10a2 2 0 0 1 2-2z' fill='none' stroke='%234fd1c5' stroke-width='2'/><path d='M12 18l3 3 5-6' fill='none' stroke='%234fd1c5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+
+<!--
+  Served from GitHub Pages at https://atmospherichitman.github.io/docfacts/
+  and takes no payments.
+
+  Every path on this page is relative, with no leading slash, because the
+  site lives in a /docfacts/ subdirectory rather than at a domain root. An
+  href of "/styles.css" would resolve to the wrong place.
+
+  Deliberately absent, and to stay absent:
+    - testimonials, logos, customer counts, "trusted by" anything
+    - any claim that the output is guaranteed accurate or complete
+    - analytics, trackers, webfonts, CDNs, or any third-party request
+    - any JavaScript at all
+    - a live payment path (see STRIPE PAYMENT LINK INTEGRATION POINT)
+    - any form, input, or other means of collecting visitor information
+
+  site-privacy.test.ts asserts all of the above on every change. If you are
+  adding something it forbids, that is a decision for the owner, not a test
+  to delete.
+
+  The terminal output in the demonstration is REAL — produced by running
+  the built CLI against the two documents shown, not written by hand.
+-->
+</head>
+<body>
+
+<div class="topbar">
+  <strong>The tool is free and published.</strong>
+  The $149 service below is a <strong>proposal</strong> with no customers, no
+  payment path, and no way to place an order.
+</div>
+
+<nav>
+  <div class="wrap">
+    <a class="logo" href="#top">
+      <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <rect x="1" y="1" width="30" height="30" rx="7" fill="#12161c" stroke="#212833"/>
+        <path d="M9 9.5h8.5L23 15v7.5a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2z"
+              stroke="#4fd1c5" stroke-width="1.8" fill="none" stroke-linejoin="round"/>
+        <path d="M11.5 18.2l2.6 2.6 4.6-5.4" stroke="#4fd1c5" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+      <span>DocFacts</span>
+    </a>
+    <div class="navlinks">
+      <a href="#demo">How it works</a>
+      <a href="#install">Install</a>
+      <a href="#limits">Limitations</a>
+      <a href="#service">Service</a>
+      <a href="https://github.com/atmospherichitman/docfacts">GitHub</a>
+      <a href="https://www.npmjs.com/package/docfacts">npm</a>
+    </div>
+    <a class="btn sm primary" href="#install">Get DocFacts Free</a>
+  </div>
+</nav>
+
+<!-- ── hero ──────────────────────────────────────────────────── -->
+<header class="hero" id="top">
+  <div class="wrap">
+    <span class="pill"><span class="dot"></span> v0.1.0 · on npm and GitHub</span>
+
+    <h1>Catch documentation mistakes <span class="em">before your users do.</span></h1>
+
+    <p class="lede">
+      Compare technical guides against their reference material. Find
+      potentially unsupported commands, configuration options, and
+      contradictions before publishing.
+    </p>
+
+    <div class="ctas">
+      <a class="btn primary" href="#install">
+        Get DocFacts Free
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.6"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+      <a class="btn" href="#demo">See How It Works</a>
+    </div>
+
+    <div class="trust">
+      <div>
+        <svg width="17" height="17" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <rect x="3" y="7" width="10" height="7" rx="1.6" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <span><strong>Runs locally.</strong> Nothing is uploaded</span>
+      </div>
+      <div>
+        <svg width="17" height="17" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M8 1.8l5.5 3v4.4L8 14.2 2.5 9.2V4.8L8 1.8z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+        </svg>
+        <span><strong>Zero dependencies.</strong> One file, no tree</span>
+      </div>
+      <div>
+        <svg width="17" height="17" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="8" cy="8" r="6.2" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M5.4 8.2l1.9 1.9 3.4-4" stroke="currentColor" stroke-width="1.6"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span><strong>CI ready.</strong> Exit codes, JSON output</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ── demonstration ─────────────────────────────────────────── -->
+<section id="demo">
+  <div class="wrap">
+    <div class="center">
+      <div class="eyebrow">The problem, and the catch</div>
+      <h2>One sentence says the option is gone.<br>The other tells you to use it.</h2>
+      <p class="section-lede">
+        Both documents read perfectly well on their own. DocFacts reads them
+        together.
+      </p>
+    </div>
+
+    <div class="demo">
+      <!-- reference -->
+      <div class="panel">
+        <div class="panel-head">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M4 2h5l3 3v9H4V2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+          </svg>
+          reference.md
+          <span class="tag">source of truth</span>
+        </div>
+<pre><span class="c"># ledgerstore 3.2 — storage reference</span>
+
+<span class="c">## Durability</span>
+
+Writes are acknowledged once the
+write-ahead log is flushed.
+
+    ledgerstore write <span class="k">--sync</span>
+    ledgerstore write <span class="k">--batch</span>
+
+<span class="hit">The <span class="flag">--unsafe-fsync</span> option was
+removed in version 3.2.</span></pre>
+      </div>
+
+      <!-- connector -->
+      <div class="connector" aria-hidden="true">
+        <div class="line"></div>
+        <div class="badge">
+          <svg aria-hidden="true" width="17" height="17" viewBox="0 0 16 16" fill="none">
+            <path d="M8 2.6l5.9 10.2H2.1L8 2.6z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M8 6.6v3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="8" cy="11.4" r="0.8" fill="currentColor"/>
+          </svg>
+        </div>
+        <div class="line"></div>
+      </div>
+
+      <!-- draft -->
+      <div class="panel">
+        <div class="panel-head">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M11.5 2.5l2 2L6 12l-2.6.6L4 10l7.5-7.5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+          </svg>
+          guide.md
+          <span class="tag">the draft</span>
+        </div>
+<pre><span class="c"># Tuning ledgerstore for
+# write throughput</span>
+
+<span class="hit">For durability, use
+<span class="flag">--unsafe-fsync</span> when writing data.</span>
+
+<span class="dim">…</span></pre>
+      </div>
+    </div>
+
+    <div class="verdict">
+      <svg width="19" height="19" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <circle cx="8" cy="8" r="6.4" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M8 4.8v3.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+        <circle cx="8" cy="11" r="0.85" fill="currentColor"/>
+      </svg>
+      <div>
+        <h3>Contradicted by the reference</h3>
+        <p>
+          The draft presents <code>--unsafe-fsync</code> as usable. The
+          reference says it was removed in 3.2. DocFacts quotes both lines, so
+          you can confirm it in seconds rather than take its word.
+        </p>
+      </div>
+    </div>
+
+    <!-- The real thing. Produced by running the built CLI on the two
+         documents above; not typed out by hand. -->
+    <div class="terminal">
+      <div class="terminal-head">
+        <div class="dots"><i></i><i></i><i></i></div>
+        <span class="path">docfacts --reference reference.md --draft guide.md</span>
+      </div>
+<pre><span class="f">Contradicted by the reference (1)</span>
+<span class="c">------------------------------</span>
+  1. [unsupported_used] the draft presents the flag <span class="f">"--unsafe-fsync"</span>
+     as usable, but the reference says it is not
+     <span class="dim">in the draft:</span>
+      <span class="s">For durability, use --unsafe-fsync when writing data.</span>
+     <span class="dim">in the reference:</span>
+      <span class="s">The --unsafe-fsync option was removed in version 3.2.</span>
+
+<span class="dim">exit 1</span></pre>
+
+      <!-- The complete report, behind a native <details>. No script: the
+           page still has zero JavaScript, and this works with it disabled. -->
+      <details class="full-report">
+        <summary>View the complete report</summary>
+<pre><span class="c">Document verification report
+===========================</span>
+
+  reference : reference.md
+  draft     : guide.md
+  tool      : ledgerstore
+
+<span class="c">What the reference declares
+---------------------------</span>
+  commands (1)
+      supported    ledgerstore write
+  flags (3)
+      supported    --batch, --sync
+      <span class="f">unsupported  --unsafe-fsync</span>
+
+<span class="f">Contradicted by the reference (1)</span>
+<span class="c">------------------------------</span>
+  1. [unsupported_used] the draft presents the flag <span class="f">"--unsafe-fsync"</span>
+     as usable, but the reference says it is not
+     <span class="dim">in the draft:</span>
+      <span class="s">For durability, use --unsafe-fsync when writing data.</span>
+     <span class="dim">in the reference:</span>
+      <span class="s">The --unsafe-fsync option was removed in version 3.2.</span>
+
+<span class="k">Not supported by the reference (0)</span>
+<span class="c">-------------------------------</span>
+  <span class="dim">These appear in the draft and not in the reference. That may mean
+  the draft invented them, or that the reference does not cover them,
+  or that this tool failed to read them. Check each against your source
+  before acting.</span>
+
+  Nothing.
+
+<span class="c">What was checked
+----------------</span>
+  0 claim(s) in the draft matched something the reference supports.
+  The reference was read as declaring 3 supported, 1 unsupported.
+
+<span class="c">Limitations
+-----------</span>
+  <span class="dim">- A clean result does NOT mean the document is correct. It means
+    nothing in it contradicted the reference in the specific ways
+    listed above.
+  - Whether the instructions work, whether an operator could follow
+    them, and whether the ordering is sane are not checked.
+  - Whether anything important is MISSING is not checked.
+  - Prose quality, tone and house style are not checked.
+  - A fact stated as prose rather than as a flag, variable, code or
+    endpoint is not cross-checked.
+  - The reference is taken as true. If the reference is wrong, a
+    document faithful to it passes.
+  - Nothing here is executed. Commands in either document are read as
+    text, never run.</span>
+
+<span class="dim">exit 1</span></pre>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ── what it does ──────────────────────────────────────────── -->
+<section id="features">
+  <div class="wrap">
+    <div class="center">
+      <div class="eyebrow">What it checks</div>
+      <h2>Claims your reference does not support</h2>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <div class="icon">
+          <svg width="19" height="19" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M2.5 4.5l3 3-3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M7.5 11.5h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h3>Invented interfaces</h3>
+        <p>Commands, flags, environment variables, exit codes and endpoints that appear nowhere in your reference.</p>
+      </div>
+
+      <div class="card">
+        <div class="icon">
+          <svg width="19" height="19" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M8 1.9l5.6 3v4.2L8 14.1 2.4 9.1V4.9L8 1.9z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M8 5.4v3.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="8" cy="11" r="0.8" fill="currentColor"/>
+          </svg>
+        </div>
+        <h3>Features the reference denies</h3>
+        <p>Options your source says were removed, are ignored, or never existed — offered to the reader as if they work.</p>
+      </div>
+
+      <div class="card">
+        <div class="icon">
+          <svg width="19" height="19" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M3 5h10M3 8h7M3 11h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h3>Contradictions and misattribution</h3>
+        <p>A default stated two ways, or a flag credited to the wrong command — <code>useradd --system</code> is right, your tool's isn't.</p>
+      </div>
+    </div>
+
+    <div class="cards" style="margin-top:var(--s4)">
+      <div class="card" style="grid-column:1/-1">
+        <h3>Two kinds of finding, never mixed</h3>
+        <p style="max-width:62ch">
+          <strong style="color:var(--ink)">Contradicted by the reference</strong> means your source says the
+          opposite, and the report shows you where.
+          <strong style="color:var(--ink)">Not supported by the reference</strong> means something is simply
+          absent — which may mean the draft invented it, or that your reference
+          does not cover it, or that DocFacts misread it.
+        </p>
+        <p style="margin-top:var(--s3);max-width:62ch">
+          Collapsing those into one list would overstate the second and make
+          the first easier to dismiss. So they get separate sections, and the
+          weaker one says plainly that it is weaker.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── install ───────────────────────────────────────────────── -->
+<section id="install">
+  <div class="wrap">
+    <div class="eyebrow">Install</div>
+    <h2>Node 20 or newer. Nothing else.</h2>
+    <p class="section-lede">
+      No configuration file, no account, no project setup. Point it at two
+      files.
+    </p>
+
+    <div class="install-grid">
+      <div>
+        <pre class="codeblock">npm install -g docfacts
+
+docfacts <span class="k">--reference</span> ./notes.md <span class="k">--draft</span> ./guide.md</pre>
+
+        <table class="exits">
+          <tr><td><code>0</code></td><td>nothing found</td></tr>
+          <tr><td><code>1</code></td><td>findings</td></tr>
+          <tr><td><code>2</code></td><td>usage or input error</td></tr>
+        </table>
+      </div>
+
+      <div>
+        <pre class="codeblock"><span class="c"># .github/workflows/docs.yml</span>
+<span class="k">permissions:</span>
+  <span class="k">contents:</span> read
+
+<span class="k">- uses:</span> actions/checkout@v4
+<span class="k">- uses:</span> atmospherichitman/docfacts@v0.1.0
+  <span class="k">with:</span>
+    <span class="k">reference:</span> docs/api-spec.md
+    <span class="k">draft:</span> docs/guide.md
+    <span class="k">fail-on-findings:</span> <span class="s">"false"</span></pre>
+
+        <p style="color:var(--muted);font-size:.9rem;margin-top:var(--s4)">
+          Run it on <code>pull_request</code>, never
+          <code>pull_request_target</code>. Start non-blocking and watch what
+          it says about your docs for a week before you let it fail a merge.
+          Add <code>--json</code> to the CLI for machine-readable output.
+        </p>
+      </div>
+    </div>
+
+    <div class="callout accent">
+      <p>
+        <strong>Published.</strong>
+        <a href="https://www.npmjs.com/package/docfacts">docfacts on npm</a> ·
+        <a href="https://github.com/atmospherichitman/docfacts">source on GitHub</a> ·
+        <a href="https://github.com/atmospherichitman/docfacts/blob/main/CHANGELOG.md">changelog</a>
+        — MIT, zero runtime dependencies.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ── limitations ───────────────────────────────────────────── -->
+<section id="limits">
+  <div class="wrap">
+    <div class="eyebrow">Limitations</div>
+    <h2>What it cannot do</h2>
+    <p class="section-lede">
+      This section is longer than the feature list, on purpose. A tool like
+      this is only useful if you know where it stops.
+    </p>
+
+    <div class="callout">
+      <p>
+        <strong>A clean report does not mean your document is correct.</strong>
+        It means nothing in it contradicted your reference in the specific
+        ways listed above. There is no accuracy guarantee here and there will
+        not be one.
+      </p>
+    </div>
+
+    <div class="limits">
+      <div>
+        <svg aria-hidden="true" width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <span><strong>Missing content isn't checked.</strong> Whether your guide covers what it needs to depends on what you need, which isn't in the reference. The largest gap.</span>
+      </div>
+      <div>
+        <svg aria-hidden="true" width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <span><strong>Facts in prose aren't cross-checked.</strong> "Requires kernel 5.10" against a reference saying 5.15 will pass.</span>
+      </div>
+      <div>
+        <svg aria-hidden="true" width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <span><strong>Nothing is executed</strong>, so nothing is validated. Whether the instructions work is not checked and cannot be.</span>
+      </div>
+      <div>
+        <svg aria-hidden="true" width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <span><strong>Prose quality and ordering</strong> aren't checked.</span>
+      </div>
+      <div>
+        <svg aria-hidden="true" width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <span><strong>Your reference is taken as true.</strong> A document faithful to a wrong reference passes.</span>
+      </div>
+      <div>
+        <svg aria-hidden="true" width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <span><strong>Inference is heuristic.</strong> A reference formatted unusually may be read wrong — which is why the report prints what it inferred before any finding.</span>
+      </div>
+    </div>
+
+    <p style="color:var(--muted);font-size:.92rem;margin-top:var(--s6);max-width:var(--measure)">
+      Tested by 2,577 automated tests and a run against six real documentation
+      pairs from ESLint, Jest, Ruff, Prettier, Vitest and uv. That run found
+      <strong style="color:var(--ink)">seven defects in DocFacts itself</strong>,
+      six of which gave confident wrong answers. All are fixed and pinned by
+      regression tests — and the synthetic test suite had found none of them,
+      which is worth knowing when weighing any claim made from synthetic tests.
+    </p>
+  </div>
+</section>
+
+<!-- ── privacy ───────────────────────────────────────────────── -->
+<section id="privacy">
+  <div class="wrap">
+    <div class="eyebrow">Privacy</div>
+    <h2>Your documents never leave your machine</h2>
+    <p class="section-lede">
+      The documents you check are often an unreleased specification. A tool for
+      reading those has no business opening a socket.
+    </p>
+
+    <div class="cards">
+      <div class="card">
+        <h3>No network code at all</h3>
+        <p>Not "we don't send much" — there is no HTTP client, no socket, no DNS lookup anywhere in the package.</p>
+      </div>
+      <div class="card">
+        <h3>No telemetry, no files written</h3>
+        <p>No analytics, no crash reporting, no cache, no config file, no state directory. Nothing to opt out of.</p>
+      </div>
+      <div class="card">
+        <h3>Verify it yourself</h3>
+        <p>A few files and no dependencies, so reading all of it is realistic. This should print nothing:</p>
+        <pre class="codeblock" style="margin-top:var(--s3);font-size:.74rem">grep -rE "fetch\(|node:http|child_process" \
+  package/dist/</pre>
+      </div>
+    </div>
+    <p style="color:var(--faint);font-size:.88rem;margin-top:var(--s5)">
+      That check runs as part of the test suite, so it keeps passing. The
+      design is to be incapable rather than well-behaved.
+    </p>
+  </div>
+</section>
+
+<!-- ── service ───────────────────────────────────────────────── -->
+<section id="service">
+  <div class="wrap">
+    <div class="eyebrow">Proposed service · Coming soon</div>
+    <h2>Don't have time to write the guide?</h2>
+    <p class="section-lede">
+      The tool above is free and always will be. This is the paid thing — and
+      it does not exist yet.
+    </p>
+
+    <div class="service">
+      <div class="callout" style="margin-top:0">
+        <p>
+          <strong>A proposal, not an offer.</strong> No customers, no completed
+          orders, no validated price. $149 is derived from what this work costs
+          elsewhere, not from anyone having paid it.
+        </p>
+      </div>
+
+      <div class="price">
+        <span class="amount">$149</span>
+        <span class="unit">per guide · fixed scope · one revision included · 48 hours</span>
+      </div>
+
+      <div class="swap">
+        <div>
+          <h4>You send</h4>
+          <ul>
+            <li>Your changelog or release notes for the breaking release</li>
+            <li>The configuration or CLI reference, before and after</li>
+            <li>Anything else that is the source of truth</li>
+          </ul>
+        </div>
+        <div>
+          <h4>You get back</h4>
+          <ul>
+            <li>A 600–900 word operator upgrade guide</li>
+            <li>The DocFacts verification report for it</li>
+            <li>An explicit list of what your material <em>doesn't</em> state, rather than invented filler</li>
+          </ul>
+        </div>
+      </div>
+
+      <p style="color:var(--muted);font-size:.93rem;max-width:62ch">
+        <strong style="color:var(--ink)">Written with AI assistance, and said plainly.</strong>
+        The draft is generated from the material you supply, checked against it
+        with the same tool above, revised once if the check fails, then read by
+        a human before it is sent. The verification report ships with it, so
+        the quality claim is checkable rather than a promise.
+      </p>
+
+      <div class="callout" id="refunds">
+        <p><strong>Proposed refund policy.</strong> A draft; it binds nobody until there is something to buy.</p>
+        <p>
+          <strong>Full refund, no questions asked,</strong> if the verification
+          report is not clean, if you identify a statement your material does
+          not support, or if it is not delivered within 48 hours of us
+          receiving usable source material.
+        </p>
+        <p>
+          No partial refunds. A document you cannot trust is worth nothing, not
+          a fraction of $149.
+        </p>
+      </div>
+
+      <div class="payslot">
+        <!--
+          STRIPE PAYMENT LINK INTEGRATION POINT.
+
+          When Stripe onboarding is complete (identity verification and a
+          connected bank account), replace the inert button below with an
+          anchor pointing at the hosted Payment Link. Nothing else on this
+          page changes.
+
+          The literal URL is deliberately not written here, even commented
+          out: site-privacy.test.ts fails on any payment-processor host
+          appearing anywhere in these files, and a commented-out example
+          would force that check to be fuzzy about what counts.
+
+          Deliberately not wired:
+            - no Stripe JS, no publishable key, no iframe, no third-party script
+            - a hosted Payment Link means card details never touch this page
+            - the link should carry a required field for the repository or
+              product URL, so an order arrives with enough to start work
+            - the confirmation should ask the customer to reply with their
+              source material; there is no upload portal and does not need
+              to be one
+
+          Until that link exists this slot stays inert. An order button that
+          looks live and is not is worse than no button.
+        -->
+        <p><strong style="color:var(--ink)">Coming soon.</strong> No payment path is connected and no orders are accepted.</p>
+        <span class="btn primary" aria-disabled="true">Coming soon — $149</span>
+        <p class="fine">Integration point marked in the page source as <code>STRIPE PAYMENT LINK INTEGRATION POINT</code>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── release status, summarised; the table lives on status.html ── -->
+<section id="status">
+  <div class="wrap narrow">
+    <div class="eyebrow">Release status</div>
+    <h2>Honest about where this is</h2>
+    <p class="section-lede">
+      DocFacts v0.1.0 is a first release, published on npm and released as a
+      GitHub Action. The free tool is finished and tested; the paid service
+      below does not exist yet and has no customers.
+    </p>
+    <div class="callout">
+      <p>
+        <strong>No accuracy guarantee is offered.</strong> A clean report
+        means nothing in your document contradicted your reference in the
+        specific ways DocFacts checks — not that the document is correct.
+      </p>
+    </div>
+    <p style="margin-top:var(--s5)">
+      <a href="status.html">Full project status &amp; limitations &rarr;</a>
+    </p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <a class="logo" href="#top">
+          <svg width="22" height="22" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+            <rect x="1" y="1" width="30" height="30" rx="7" fill="#12161c" stroke="#212833"/>
+            <path d="M9 9.5h8.5L23 15v7.5a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2z"
+                  stroke="#4fd1c5" stroke-width="1.8" fill="none" stroke-linejoin="round"/>
+            <path d="M11.5 18.2l2.6 2.6 4.6-5.4" stroke="#4fd1c5" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+          <span>DocFacts</span>
+        </a>
+        <p>MIT licensed. Reads two local files, prints a report. No network code, no dependencies.</p>
+        <p class="footlinks">
+          <a href="https://github.com/atmospherichitman/docfacts">GitHub</a> ·
+          <a href="https://www.npmjs.com/package/docfacts">npm</a> ·
+          <a href="https://github.com/atmospherichitman/docfacts/blob/main/README.md">Docs</a> ·
+          <a href="https://github.com/atmospherichitman/docfacts/blob/main/SECURITY.md">Security</a> ·
+          <a href="https://github.com/atmospherichitman/docfacts/issues">Issues</a> ·
+          <a href="status.html">Status</a>
+        </p>
+      </div>
+      <div style="max-width:30ch">
+        <p style="margin-top:0">
+          A clean DocFacts report is not a guarantee that a document is
+          correct. It means nothing in it contradicted the supplied reference
+          in the specific ways the tool checks.
+        </p>
+      </div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

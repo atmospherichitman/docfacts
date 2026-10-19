@@ -1,0 +1,105 @@
+# Publishes the website to https://atmospherichitman.github.io/docfacts/
+#
+# ── Why GitHub Actions rather than a branch or a /docs folder ───────────
+#
+# Pages offers three routes. Serving a branch folder needs no workflow at
+# all, but only `/` or `/docs` are allowed, so the site would have to be
+# renamed into `docs/` — a confusing name in a repository whose subject is
+# documentation. A `gh-pages` branch needs a workflow that pushes to it,
+# which means granting `contents: write`.
+#
+# This route grants no write access to the repository at all. The build job
+# runs read-only; only the deploy job gets `pages: write` and `id-token:
+# write`, and only for the moment it needs them. It also uploads one named
+# directory, so what reaches the internet is a list you can read in this
+# file rather than whatever happens to be committed.
+name: Deploy website
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+# Read-only by default. The deploy job widens this for itself, below.
+permissions:
+  contents: read
+
+# One deployment at a time, and never cancel one halfway: an interrupted
+# deploy can leave the site serving a partial upload.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Check and package the site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The repository is public and the site is static, so nothing here is
+      # secret. This guards against the other failure: a file that does not
+      # belong in a published directory ending up in one — a note, a backup,
+      # an export, an environment file.
+      - name: Refuse to deploy anything that is not a static site asset
+        run: |
+          set -euo pipefail
+
+          echo "Files to be deployed:"
+          find site -type f | sort | sed 's/^/  /'
+          echo
+
+          # Allowlist by extension. Anything else is a deliberate decision
+          # and should be made here, in a diff, rather than by dropping a
+          # file into the directory.
+          unexpected=$(find site -type f ! -regex '.*\.\(html\|css\|svg\|png\|jpg\|jpeg\|webp\|ico\|woff2\|yml\|txt\)$' || true)
+          if [ -n "$unexpected" ]; then
+            echo "::error::these files are not static site assets:"
+            echo "$unexpected"
+            exit 1
+          fi
+
+          # No executable content, and nothing that reaches a third party.
+          if grep -rniE '<script|googletagmanager|google-analytics|gtag\(|plausible\.io|posthog|mixpanel|hotjar|segment\.(io|com)|fullstory|clarity\.ms' site/; then
+            echo "::error::the site contains a script or a tracker"
+            exit 1
+          fi
+
+          # No way for a visitor to send anything anywhere.
+          if grep -rniE '<form|<input|<textarea|js\.stripe\.com|buy\.stripe\.com|pk_(live|test)_' site/; then
+            echo "::error::the site collects input or carries a payment path"
+            exit 1
+          fi
+
+          echo "Site contents verified."
+
+      - uses: actions/configure-pages@v5
+
+      # Only this directory is uploaded. Nothing else in the checkout is
+      # packaged, so source, tests and history never reach the artifact.
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+
+    # Scoped to this job, and these are the minimum Pages accepts:
+    # `pages: write` to publish, `id-token: write` for the OIDC token that
+    # proves the deployment came from this workflow.
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

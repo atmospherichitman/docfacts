@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project status — DocFacts</title>
+<meta name="description" content="Where DocFacts actually stands: release status, what the tool does not check, and the state of the proposed paid service.">
+<meta name="color-scheme" content="dark">
+<link rel="canonical" href="https://atmospherichitman.github.io/docfacts/status.html">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230a0c0f'/><path d='M9 10h9l5 5v7a2 2 0 0 1-2 2h-12a2 2 0 0 1-2-2v-10a2 2 0 0 1 2-2z' fill='none' stroke='%234fd1c5' stroke-width='2'/><path d='M12 18l3 3 5-6' fill='none' stroke='%234fd1c5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+
+<!--
+  The development-status page, kept off the homepage.
+
+  It stays in the site rather than being deleted. A product page that says
+  nothing about its own maturity is the normal kind; one that links to a page
+  like this is the kind worth trusting.
+-->
+</head>
+<body>
+
+<div class="topbar">
+  <strong>The tool is free and published.</strong>
+  The $149 service is a proposal and accepts no payment.
+</div>
+
+<nav>
+  <div class="wrap">
+    <a class="logo" href="index.html">
+      <svg aria-hidden="true" width="26" height="26" viewBox="0 0 32 32" fill="none">
+        <rect x="1" y="1" width="30" height="30" rx="7" fill="#12161c" stroke="#212833"/>
+        <path d="M9 9.5h8.5L23 15v7.5a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2z"
+              stroke="#4fd1c5" stroke-width="1.8" fill="none" stroke-linejoin="round"/>
+        <path d="M11.5 18.2l2.6 2.6 4.6-5.4" stroke="#4fd1c5" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+      <span>DocFacts</span>
+    </a>
+    <div class="navlinks">
+      <a href="index.html#demo">How it works</a>
+      <a href="index.html#install">Install</a>
+      <a href="index.html#limits">Limitations</a>
+      <a href="index.html#service">Service</a>
+    </div>
+    <a class="btn sm primary" href="index.html#install">Get DocFacts Free</a>
+  </div>
+</nav>
+
+<header class="hero" style="padding-bottom:var(--s5)">
+  <div class="wrap narrow">
+    <h1 style="font-size:clamp(1.9rem,4.5vw,2.8rem);max-width:20ch">Project status</h1>
+    <p class="lede">
+      Most product pages imply more than is true. This one says it instead.
+    </p>
+  </div>
+</header>
+
+<section>
+  <div class="wrap narrow">
+    <div class="eyebrow">Where this stands</div>
+    <h2>The honest version</h2>
+
+    <table class="status-table">
+      <thead><tr><th>Thing</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>The free tool</td><td><strong>Published</strong> as <code>docfacts@0.1.0</code> on npm, 19 October 2026</td></tr>
+        <tr><td>The GitHub Action</td><td><strong>Released</strong> at <code>v0.1.0</code>. Passes its hosted integration tests on a real runner</td></tr>
+        <tr><td>Automated tests</td><td>182 in the public repository, green on Ubuntu, Windows and macOS for Node 20 and 22</td></tr>
+        <tr><td>Real-world testing</td><td>Six public documentation pairs. Found <strong>seven defects in the tool</strong>, all fixed</td></tr>
+        <tr><td>Customers</td><td><strong>None.</strong> Nobody has bought anything</td></tr>
+        <tr><td>Completed paid orders</td><td><strong>Zero</strong></td></tr>
+        <tr><td>The $149 service</td><td>A proposal. No payment path, no orders accepted</td></tr>
+        <tr><td>The $149 price</td><td>Not validated by any sale</td></tr>
+        <tr><td>Testimonials</td><td>None — there are no customers to quote</td></tr>
+        <tr><td>Accuracy guarantee</td><td>None offered, and none planned</td></tr>
+        <tr><td>This website</td><td>Served from GitHub Pages. No analytics, no cookies, no third-party requests</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="wrap narrow">
+    <div class="eyebrow">Maturity</div>
+    <h2>What a first release means here</h2>
+
+    <p style="color:var(--muted)">
+      DocFacts was tested against six real documentation pairs — ESLint, Jest,
+      Ruff, Prettier, Vitest and uv. That run produced six confident false
+      findings and about twenty-five noisy ones, and <strong style="color:var(--ink)">every
+      one was a defect in DocFacts rather than in the documents</strong>.
+    </p>
+    <p style="color:var(--muted)">
+      All seven underlying bugs are fixed and pinned by regression tests. The
+      useful part is what it says about confidence: a suite of 2,600 synthetic
+      tests had found none of them, because the fixtures were written by the
+      same person who wrote the parser. Six <code>curl</code> commands found
+      them in an afternoon.
+    </p>
+
+    <div class="callout">
+      <p>
+        <strong>So: expect it to work on documentation shaped like those
+        projects, and expect surprises on documentation shaped differently.</strong>
+        A reference it reads wrong is the single most useful bug report you
+        can send.
+      </p>
+    </div>
+
+    <h3 style="margin-top:var(--s7)">Known gaps</h3>
+    <ul class="tight" style="color:var(--muted)">
+      <li>A fabricated status code in a table under a heading that does not mention codes is not detected. That scoping exists because without it a table of <em>flag values</em> was read as undocumented exit codes and flagged correct work.</li>
+      <li>A fabricated subcommand whose name is a common English word may be missed — traded deliberately against a much more common false positive.</li>
+      <li>Inference is heuristic and sensitive to formatting. The report prints what it inferred, before any finding, so a wrong reading is visible rather than silent.</li>
+    </ul>
+
+    <p style="margin-top:var(--s6)">
+      <a href="index.html#limits">The full limitations &rarr;</a>
+    </p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <a class="logo" href="index.html">
+          <svg aria-hidden="true" width="22" height="22" viewBox="0 0 32 32" fill="none">
+            <rect x="1" y="1" width="30" height="30" rx="7" fill="#12161c" stroke="#212833"/>
+            <path d="M9 9.5h8.5L23 15v7.5a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2z"
+                  stroke="#4fd1c5" stroke-width="1.8" fill="none" stroke-linejoin="round"/>
+            <path d="M11.5 18.2l2.6 2.6 4.6-5.4" stroke="#4fd1c5" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+          <span>DocFacts</span>
+        </a>
+        <p>MIT licensed. Reads two local files, prints a report. No network code, no dependencies.</p>
+      </div>
+      <div style="max-width:30ch">
+        <p style="margin-top:0">
+          A clean DocFacts report is not a guarantee that a document is
+          correct. It means nothing in it contradicted the supplied reference
+          in the specific ways the tool checks.
+        </p>
+      </div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

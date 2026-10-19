@@ -1,0 +1,29 @@
+# Example: check a guide against its spec on every documentation change.
+#
+# Copy into .github/workflows/docs.yml
+name: Documentation
+on:
+  pull_request:          # never pull_request_target
+    paths: ["docs/**"]
+
+# Read-only. Checking documentation needs nothing more, and a write-capable
+# token is a token a pull request can abuse.
+permissions:
+  contents: read
+
+jobs:
+  docfacts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # Start with fail-on-findings: false. See what it says about your
+      # documentation for a week before you let it block a merge.
+      - uses: atmospherichitman/docfacts@v0
+        with:
+          reference: docs/api-spec.md
+          draft: docs/getting-started.md
+          fail-on-findings: "false"
