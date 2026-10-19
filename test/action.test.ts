@@ -1,5 +1,5 @@
 /**
- * The GitHub Action's security contract, asserted textually.
+ * The GitHub Action's security contract.
  *
  * This is the guard that would have caught the bug that shipped. An earlier
  * version of this action interpolated workflow inputs straight into its bash
@@ -7,54 +7,73 @@
  * while before anyone opened the file again. Nothing failed in the meantime,
  * because nothing was checking.
  *
- * So these tests read `action.yml` as text and assert the four properties
- * that version got wrong. Deliberately dependency-free (no YAML parser) so
- * it can run anywhere the package runs, including in the published
- * repository's own CI on every pull request.
- *
  * A companion suite in the development repository *executes* the extracted
- * script against a stubbed CLI and checks the behaviour. This one checks the
+ * script against a stubbed CLI and checks its behaviour. This one checks its
  * shape. Both are needed: shape alone is what was previously reviewed, and
  * reviewing shape by eye is how the bug survived.
+ *
+ * ── Why this parses YAML instead of matching text ───────────────────────
+ *
+ * The first version of this file asserted on the raw file with multiline
+ * regular expressions, and two of them used `.*\n`. In JavaScript `\r` is a
+ * line terminator, so `.` does not match it, and `.*\n` cannot match a line
+ * ending in CRLF. On a Windows checkout — `core.autocrlf` is `true` there by
+ * default — those two tests failed while Ubuntu and macOS passed. The action
+ * was correct; the tests were wrong about the file they were reading.
+ *
+ * Parsing structurally removes that whole class of problem: the YAML parser
+ * normalises line endings itself, so the assertions are about the document
+ * rather than about how a platform happens to spell a newline. The few
+ * assertions that genuinely are about shell source text normalise line
+ * endings first and say so.
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
 import fs from "node:fs";
+import YAML from "yaml";
 
-/** Resolved once; the file sits at the repository root in both layouts. */
+/** The file sits at the repository root in both the public and dev layouts. */
 const CANDIDATES = ["action.yml", "packages/docfacts/action.yml"];
 
-let raw: string;
-/** The body of the `run:` block — the part that becomes shell source. */
+interface ActionStep {
+  id?: string;
+  shell?: string;
+  run?: string;
+  env?: Record<string, string>;
+}
+
+interface ActionFile {
+  inputs?: Record<string, { description?: string; required?: boolean; default?: unknown }>;
+  outputs?: Record<string, { description?: string; value?: string }>;
+  runs?: { using?: string; steps?: ActionStep[] };
+}
+
+let action: ActionFile;
+let step: ActionStep;
+/** The shell source, with line endings normalised. */
 let runScript: string;
 
 beforeAll(() => {
   const found = CANDIDATES.find((p) => fs.existsSync(p));
   expect(found, `action.yml not found in any of ${CANDIDATES.join(", ")}`).toBeDefined();
-  raw = fs.readFileSync(found as string, "utf-8");
 
-  // Textual extraction rather than a YAML parse, so this test needs nothing
-  // installed. The block starts at `run: |` and runs to the end of file or
-  // to the next line indented less than the block's body.
-  const lines = raw.split(/\r?\n/);
-  const start = lines.findIndex((l) => /^\s*run:\s*\|/.test(l));
-  expect(start, "action.yml has no `run: |` block").toBeGreaterThan(-1);
+  action = YAML.parse(fs.readFileSync(found as string, "utf-8")) as ActionFile;
 
-  const body: string[] = [];
-  const indent = (l: string) => l.length - l.trimStart().length;
-  let blockIndent: number | null = null;
-  for (const line of lines.slice(start + 1)) {
-    if (line.trim() === "") {
-      body.push(line);
-      continue;
-    }
-    if (blockIndent === null) blockIndent = indent(line);
-    if (indent(line) < blockIndent) break;
-    body.push(line);
-  }
-  runScript = body.join("\n");
-  expect(runScript.length, "the extracted run block is empty").toBeGreaterThan(100);
+  expect(action.runs?.using, "the action is not a composite action").toBe("composite");
+  const steps = action.runs?.steps ?? [];
+  expect(steps.length, "the action has no steps").toBeGreaterThan(0);
+  step = steps[0];
+
+  expect(typeof step.run, "the first step has no run block").toBe("string");
+  // A YAML block scalar already normalises line breaks, but normalising
+  // again costs nothing and makes the intent explicit for anyone who adds an
+  // assertion below.
+  runScript = (step.run as string).replace(/\r\n/g, "\n");
+  expect(runScript.length, "the run block is suspiciously short").toBeGreaterThan(100);
 });
+
+/** The inputs the action declares, as a list of names. */
+const inputNames = (): string[] => Object.keys(action.inputs ?? {});
 
 describe("no workflow input reaches the shell as source text", () => {
   it("has no ${{ }} expression anywhere in the run block", () => {
@@ -65,34 +84,35 @@ describe("no workflow input reaches the shell as source text", () => {
       .split("\n")
       .map((line, i) => [i + 1, line] as const)
       .filter(([, line]) => line.includes("${{"));
-    expect(offenders, `run block interpolates expressions:\n${offenders.map(([n, l]) => `  ${n}: ${l.trim()}`).join("\n")}`).toEqual([]);
+    expect(
+      offenders,
+      `run block interpolates expressions:\n${offenders.map(([n, l]) => `  ${n}: ${l.trim()}`).join("\n")}`,
+    ).toEqual([]);
   });
 
-  it("passes every declared input through an env block instead", () => {
-    // Scoped to the `inputs:` section. Keys under `outputs:` are indented
-    // identically, and counting those made this test demand that an output
-    // be passed in as an input.
-    const section = /^inputs:\s*$([\s\S]*?)^[a-z]/m.exec(raw);
-    expect(section, "action.yml has no inputs: section").not.toBeNull();
-    const declared = [...(section as RegExpExecArray)[1].matchAll(/^ {2}([a-z][a-z0-9-]*):\s*$/gm)].map(
-      (m) => m[1],
-    );
-    expect(declared.length, "no inputs were found to check").toBeGreaterThan(0);
-    for (const name of declared) {
+  it("passes every declared input through the step's env block", () => {
+    const env = step.env ?? {};
+    const mapped = Object.values(env).map((v) => String(v).trim());
+
+    expect(inputNames().length, "the action declares no inputs").toBeGreaterThan(0);
+    for (const name of inputNames()) {
+      // Exactly the canonical form, so a near-miss like `inputs.reference`
+      // without braces cannot satisfy it.
       expect(
-        raw.includes(`\${{ inputs.${name} }}`),
-        `input '${name}' is declared but never passed anywhere`,
+        mapped.includes(`\${{ inputs.${name} }}`),
+        `input '${name}' is declared but not mapped into the env block; env is ${JSON.stringify(env)}`,
       ).toBe(true);
     }
-    // And each of those references must sit in an `env:` mapping, which is
-    // the only safe place for them.
-    const envBlock = /env:\s*\n((?:\s+DF_[A-Z_]+:.*\n)+)/.exec(raw);
-    expect(envBlock, "the step has no env: block mapping inputs").not.toBeNull();
-    for (const name of declared) {
-      expect(
-        (envBlock as RegExpExecArray)[1].includes(`inputs.${name}`),
-        `input '${name}' is not mapped into the env block`,
-      ).toBe(true);
+  });
+
+  it("maps nothing into env except declared inputs", () => {
+    // A stray `${{ github.event.pull_request.title }}` in env would be
+    // attacker-controlled data arriving under a trusted-looking name.
+    const allowed = new Set(inputNames().map((n) => `\${{ inputs.${n} }}`));
+    for (const [key, value] of Object.entries(step.env ?? {})) {
+      const v = String(value).trim();
+      if (!v.includes("${{")) continue;
+      expect(allowed.has(v), `env.${key} maps ${v}, which is not a declared input`).toBe(true);
     }
   });
 
@@ -158,10 +178,19 @@ describe("the CLI runs once, at a pinned version", () => {
     expect(runScript.match(/npx\s+--yes/g) ?? []).toHaveLength(1);
   });
 
-  it("pins the version rather than following the latest release", () => {
+  it("takes the version from the input rather than following the latest release", () => {
     expect(runScript).toMatch(/docfacts@\$\{DF_VERSION\}/);
-    const def = /version:\s*\n(?:\s+.*\n)*?\s+default:\s*"(\d+\.\d+\.\d+)"/.exec(raw);
-    expect(def, "the version input has no exact default").not.toBeNull();
+  });
+
+  it("defaults the version input to an exact version", () => {
+    // Read from the parsed document, not matched in the file. YAML may quote
+    // this or not, and on a CRLF checkout the line does not end where an
+    // LF-only pattern expects it to.
+    const version = action.inputs?.version;
+    expect(version, "the action declares no version input").toBeDefined();
+    expect(String(version?.default), "the version default is not an exact version").toMatch(
+      /^\d+\.\d+\.\d+$/,
+    );
   });
 
   it("validates the version before it becomes part of a package spec", () => {
@@ -189,15 +218,45 @@ describe("input validation", () => {
   });
 });
 
-describe("the documented contract matches the file", () => {
-  it("declares the version input that SECURITY.md tells people to pin", () => {
+describe("the declared interface", () => {
+  it("declares the version input SECURITY.md tells people to pin", () => {
     if (!fs.existsSync("SECURITY.md")) return;
     const security = fs.readFileSync("SECURITY.md", "utf-8");
     if (!/pin the `version` input/i.test(security)) return;
-    expect(raw).toMatch(/^ {2}version:\s*$/m);
+    expect(action.inputs?.version, "SECURITY.md documents an input that does not exist").toBeDefined();
   });
 
-  it("exposes the report path so a workflow can upload it", () => {
-    expect(raw).toMatch(/^ {2}report:\s*$/m);
+  it("exposes the findings count and the report path", () => {
+    expect(Object.keys(action.outputs ?? {}).sort()).toEqual(["findings", "report"]);
+  });
+
+  it("builds its outputs from the step, not from an input", () => {
+    for (const [name, output] of Object.entries(action.outputs ?? {})) {
+      expect(String(output.value), `output '${name}' does not come from the step`).toMatch(
+        /^\$\{\{\s*steps\.[a-z_]+\.outputs\.[a-z_]+\s*\}\}$/,
+      );
+    }
+  });
+});
+
+describe("the tests themselves are not fooled by line endings", () => {
+  // The regression this file is a correction for: two assertions used `.*\n`,
+  // which cannot match a CRLF line because `.` excludes `\r` in JavaScript.
+  // Ubuntu and macOS passed, Windows failed, and the action was fine.
+  it("reaches the same conclusions on a CRLF copy of the file", () => {
+    const found = CANDIDATES.find((p) => fs.existsSync(p)) as string;
+    const raw = fs.readFileSync(found, "utf-8");
+    const lf = raw.replace(/\r\n/g, "\n");
+    const crlf = lf.replace(/\n/g, "\r\n");
+
+    const fromLf = YAML.parse(lf) as ActionFile;
+    const fromCrlf = YAML.parse(crlf) as ActionFile;
+
+    expect(JSON.stringify(fromCrlf)).toEqual(JSON.stringify(fromLf));
+    expect(fromCrlf.inputs?.version?.default).toBe(fromLf.inputs?.version?.default);
+    expect(fromCrlf.runs?.steps?.[0].env).toEqual(fromLf.runs?.steps?.[0].env);
+    // And the block scalar comes back without carriage returns either way,
+    // so the shell-source assertions above are safe.
+    expect(String(fromCrlf.runs?.steps?.[0].run)).not.toMatch(/\r/);
   });
 });
