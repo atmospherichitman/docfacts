@@ -100,19 +100,28 @@ describe("nothing third-party", () => {
   });
 
   it("has no analytics or tracking identifiers", () => {
+    // Hosts and call signatures, not bare product names. Three of these are
+    // ordinary English words — "plausible", "fathom", "segment" — and the
+    // page now contains the sentence "written to look plausible", which the
+    // looser form flagged as an analytics script. A check that fires on
+    // prose gets edited to make the failure stop, which is how it ends up
+    // not checking anything.
     for (const tracker of [
       "google-analytics",
       "googletagmanager",
       "gtag(",
-      "plausible",
-      "fathom",
-      "segment",
+      "plausible.io",
+      "usefathom",
+      "segment.io",
+      "segment.com",
       "mixpanel",
       "hotjar",
       "posthog",
       "clarity.ms",
       "facebook.net",
       "doubleclick",
+      "matomo",
+      "amplitude.com",
     ]) {
       expect(html.toLowerCase(), tracker).not.toContain(tracker);
     }
@@ -441,5 +450,83 @@ describe("the Pages deployment workflow", () => {
     // A deployment triggered by a pull request would publish unreviewed
     // content to the live site.
     expect(fs.readFileSync(workflow, "utf-8")).not.toMatch(/pull_request/);
+  });
+});
+
+/**
+ * The worked example's two outcomes.
+ *
+ * A demonstration that shows a finding the documents would not actually
+ * produce is worse than no demonstration: it teaches the reader to expect
+ * something the tool does not do. These check internal consistency — that
+ * the thing flagged is really in both quoted documents, and that the
+ * "corrected" case really has nothing left to flag.
+ *
+ * They do not, and cannot, show that DocFacts is accurate. Two prepared
+ * examples say nothing about that.
+ */
+describe("the worked example is consistent with its own documents", () => {
+  const pane = (name: "broken" | "fixed"): string => {
+    const start = html.indexOf(`<div class="pane pane-${name}">`);
+    expect(start, `pane-${name} is missing`).toBeGreaterThan(-1);
+    const next = html.indexOf('<div class="pane pane-', start + 10);
+    const end = next === -1 ? html.indexOf("</section>", start) : next;
+    return html.slice(start, end);
+  };
+
+  it("flags a setting that really does appear in both quoted documents", () => {
+    const broken = pane("broken");
+    const flagged = /the draft presents the flag <span class="f">"([^"]+)"<\/span>/.exec(broken);
+    expect(flagged, "no flagged option found in the result panel").not.toBeNull();
+    const option = (flagged as RegExpExecArray)[1];
+
+    const quotes = [...broken.matchAll(/<blockquote class="quote">([\s\S]*?)<\/blockquote>/g)].map(
+      (m) => m[1],
+    );
+    expect(quotes.length, "expected a reference quote and a draft quote").toBe(2);
+
+    // The reference must say it was removed; the draft must still use it.
+    expect(quotes[0], `the reference quote does not mention ${option}`).toContain(option);
+    expect(quotes[0]).toMatch(/removed/i);
+    expect(quotes[1], `the draft quote does not use ${option}`).toContain(option);
+  });
+
+  it("reports exactly one finding and a failing exit code for the broken case", () => {
+    const broken = pane("broken");
+    expect(broken).toMatch(/Contradicted by the reference \(1\)/);
+    expect(broken).toMatch(/exit 1/);
+    expect(broken).not.toMatch(/exit 0/);
+  });
+
+  it("reports no findings and a passing exit code for the corrected case", () => {
+    const fixed = pane("fixed");
+    expect(fixed).toMatch(/Contradicted by the reference \(0\)/);
+    expect(fixed).toMatch(/exit 0/);
+    expect(fixed).not.toMatch(/exit 1/);
+  });
+
+  it("does not leave the removed option in the corrected draft", () => {
+    const fixed = pane("fixed");
+    const quotes = [...fixed.matchAll(/<blockquote class="quote">([\s\S]*?)<\/blockquote>/g)].map(
+      (m) => m[1],
+    );
+    expect(quotes.length).toBe(2);
+    // The reference still mentions it, because it is the thing that was
+    // removed. The draft must not.
+    expect(quotes[1], "the corrected draft still uses --fast-mode").not.toContain("--fast-mode");
+  });
+
+  it("says plainly that it is prepared output rather than a live checker", () => {
+    expect(visible).toMatch(/Illustrative example/i);
+    expect(visible).toMatch(/not a live checker/i);
+    expect(visible).toMatch(/prepared in advance/i);
+    // And does not overclaim from two examples.
+    expect(visible).toMatch(/say nothing about how\s+accurate/i);
+  });
+
+  it("switches panes with no script at all", () => {
+    expect(visible).not.toMatch(/<script\b/i);
+    expect(css).toMatch(/#ex-broken:checked\s*~\s*\.pane-broken/);
+    expect(css).toMatch(/#ex-fixed:checked\s*~\s*\.pane-fixed/);
   });
 });

@@ -597,3 +597,177 @@ footer .logo { margin-bottom: var(--s2); }
 .full-report summary:hover { color: var(--ink); }
 .full-report summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .full-report pre { border-top: 1px solid var(--border); }
+
+/* ── the hero's "you give it two files" block ───────────────── */
+
+.inputs {
+  margin: var(--s6) auto 0;
+  max-width: 62ch;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: var(--s5) var(--s5) var(--s4);
+}
+.inputs-title {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 var(--s3);
+}
+.inputs-list { margin: 0; padding-left: 1.3em; }
+.inputs-list li { margin-bottom: var(--s3); color: var(--muted); }
+.inputs-list strong { color: var(--ink); }
+.inputs-note {
+  margin: var(--s4) 0 0;
+  padding-top: var(--s4);
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+.free-note { margin-top: var(--s5); color: var(--faint); font-size: 0.9rem; }
+
+/* ── the worked example and its switcher ────────────────────── */
+
+/*
+ * Visually hidden, but still focusable and still announced. `display:none`
+ * or `visibility:hidden` would drop the radios out of the tab order and
+ * make the switcher keyboard-inoperable.
+ */
+.vh {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.switcher { margin-top: var(--s6); }
+
+.switch-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  justify-content: center;
+  margin-bottom: var(--s5);
+}
+.switch-tabs label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px var(--s4);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.switch-tabs label:hover { color: var(--ink); border-color: var(--border-bright); }
+
+.swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.55;
+}
+
+/* The selected pane, chosen entirely by the radio state. */
+.pane { display: none; }
+#ex-broken:checked ~ .pane-broken,
+#ex-fixed:checked ~ .pane-fixed { display: block; }
+
+/* The selected tab. */
+#ex-broken:checked ~ .switch-tabs label[for="ex-broken"],
+#ex-fixed:checked ~ .switch-tabs label[for="ex-fixed"] {
+  color: var(--ink);
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+#ex-broken:checked ~ .switch-tabs label[for="ex-broken"] .swatch,
+#ex-fixed:checked ~ .switch-tabs label[for="ex-fixed"] .swatch { opacity: 1; }
+
+/* Keyboard focus has to land somewhere visible, since the input itself is
+   clipped off-screen. Without this the switcher is operable by keyboard but
+   gives no sign of where you are, which is worse than not being operable. */
+#ex-broken:focus-visible ~ .switch-tabs label[for="ex-broken"],
+#ex-fixed:focus-visible ~ .switch-tabs label[for="ex-fixed"] {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* ── the three steps ────────────────────────────────────────── */
+
+.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--s4);
+}
+@media (min-width: 900px) {
+  .steps { grid-template-columns: repeat(3, 1fr); align-items: start; }
+}
+
+.step {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: var(--s4);
+}
+.step-head { display: flex; gap: var(--s3); align-items: flex-start; }
+.step-n {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.step-head h4 { margin: 0; font-size: 0.98rem; }
+.step-head p { margin: 2px 0 0; color: var(--faint); font-size: 0.85rem; }
+
+.quote {
+  margin: var(--s4) 0 0;
+  padding: var(--s3) var(--s4);
+  border-left: 2px solid var(--border-bright);
+  background: var(--bg);
+  border-radius: 0 8px 8px 0;
+  color: var(--ink);
+  font-size: 0.94rem;
+}
+.quote code { font-size: 0.88em; }
+
+.step .verdict { margin: var(--s4) 0 0; }
+.step .verdict h5 { margin: 0; font-size: 0.95rem; }
+.step .verdict p { margin: var(--s2) 0 0; font-size: 0.88rem; }
+.verdict.ok { color: var(--accent); }
+.verdict.ok h5 { color: var(--accent); }
+
+.terminal-lite {
+  margin: var(--s4) 0 0;
+  padding: var(--s4);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch-tabs label { transition: none; }
+}

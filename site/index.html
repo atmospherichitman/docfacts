@@ -55,7 +55,7 @@
       <span>DocFacts</span>
     </a>
     <div class="navlinks">
-      <a href="#demo">How it works</a>
+      <a href="#example">How it works</a>
       <a href="#install">Install</a>
       <a href="#limits">Limitations</a>
       <a href="#service">Service</a>
@@ -71,24 +71,57 @@
   <div class="wrap">
     <span class="pill"><span class="dot"></span> v0.1.0 · on npm and GitHub</span>
 
-    <h1>Catch documentation mistakes <span class="em">before your users do.</span></h1>
+    <h1>Catch made-up commands <span class="em">before they reach your users.</span></h1>
 
     <p class="lede">
-      Compare technical guides against their reference material. Find
-      potentially unsupported commands, configuration options, and
-      contradictions before publishing.
+      AI-written documentation can look correct even when it contains
+      commands, settings, or options that don't exist. DocFacts compares your
+      draft against a reference document and highlights technical claims that
+      don't match.
     </p>
+
+    <!-- What a visitor actually has to provide. The first question anyone
+         asks about a checking tool is "checked against what?" -->
+    <div class="inputs">
+      <h2 class="inputs-title">You give it two files</h2>
+      <ol class="inputs-list">
+        <li>
+          <strong>A reference document</strong> — the one that describes how
+          your software actually works. A spec, a changelog, a config
+          reference, release notes.
+        </li>
+        <li>
+          <strong>A draft guide or tutorial</strong> — the page you are about
+          to publish, and want checked.
+        </li>
+      </ol>
+      <p class="inputs-note">
+        DocFacts reads them together and reports where the draft claims
+        something the reference does not support. It checks specific
+        technical details — commands, options, settings, error codes, web
+        addresses — against the reference you supply.
+        <strong>It is not a general-purpose fact-checker</strong>, and it
+        knows nothing beyond the two files you hand it.
+      </p>
+    </div>
 
     <div class="ctas">
       <a class="btn primary" href="#install">
-        Get DocFacts Free
+        Install DocFacts
         <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
           <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.6"
                 stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </a>
-      <a class="btn" href="#demo">See How It Works</a>
+      <a class="btn" href="#example">See an example</a>
+      <a class="btn" href="https://github.com/atmospherichitman/docfacts">View on GitHub</a>
     </div>
+
+    <p class="free-note">
+      Free and open source. No account, no API key, no signup — it runs on
+      your machine. Also on
+      <a href="https://www.npmjs.com/package/docfacts">npm</a>.
+    </p>
 
     <div class="trust">
       <div>
@@ -115,6 +148,195 @@
     </div>
   </div>
 </header>
+
+<!-- ── the worked example, and the switcher ──────────────────── -->
+<!--
+  The switcher is two radio buttons and a CSS sibling selector. No
+  JavaScript, which is why the page still has none: the panes are both in
+  the HTML and `:checked ~ .pane` decides which one is shown. It therefore
+  works with scripting disabled, is keyboard-operable with arrow keys
+  because that is what a radio group does natively, and announces itself to
+  a screen reader as "radio button, 1 of 2" without any ARIA at all.
+
+  The radios are visually hidden with the clip technique rather than
+  `display:none`, which would remove them from the tab order.
+
+  Both outcomes are REAL output. They were produced by running
+  docfacts@0.1.0 on the two documents shown in each pane; the wording,
+  the finding kind and the exit codes are copied from its report, not
+  written to look plausible.
+-->
+<section id="example">
+  <div class="wrap">
+    <div class="center">
+      <div class="eyebrow">Illustrative example</div>
+      <h2>What a check actually looks like</h2>
+      <p class="section-lede">
+        A made-up example, small enough to read in one go. Pick either
+        version of the guide to see what DocFacts reports.
+      </p>
+    </div>
+
+    <div class="switcher">
+      <h3 class="vh" id="switch-label">Choose an example</h3>
+
+      <input class="vh switch-input" type="radio" name="example-choice" id="ex-broken" checked>
+      <input class="vh switch-input" type="radio" name="example-choice" id="ex-fixed">
+
+      <div class="switch-tabs">
+        <label for="ex-broken">
+          <span class="swatch bad" aria-hidden="true"></span>
+          A guide with a mistake
+        </label>
+        <label for="ex-fixed">
+          <span class="swatch good" aria-hidden="true"></span>
+          The same guide, corrected
+        </label>
+      </div>
+
+      <!-- ── pane: the mistake ──────────────────────────────── -->
+      <div class="pane pane-broken">
+        <ol class="steps">
+          <li class="step">
+            <div class="step-head">
+              <span class="step-n">1</span>
+              <div>
+                <h4>The official reference</h4>
+                <p>What the software's own documentation says.</p>
+              </div>
+            </div>
+            <blockquote class="quote">
+              Version 2.0 removed the <code>--fast-mode</code> option.
+            </blockquote>
+          </li>
+
+          <li class="step">
+            <div class="step-head">
+              <span class="step-n">2</span>
+              <div>
+                <h4>The draft guide</h4>
+                <p>What someone wrote for your users to follow.</p>
+              </div>
+            </div>
+            <blockquote class="quote">
+              Run <code>app build --fast-mode</code> for better performance.
+            </blockquote>
+          </li>
+
+          <li class="step">
+            <div class="step-head">
+              <span class="step-n">3</span>
+              <div>
+                <h4>What DocFacts reports</h4>
+                <p>It reads both and finds the disagreement.</p>
+              </div>
+            </div>
+            <div class="verdict">
+              <svg width="19" height="19" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <circle cx="8" cy="8" r="6.4" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M8 4.8v3.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                <circle cx="8" cy="11" r="0.85" fill="currentColor"/>
+              </svg>
+              <div>
+                <h5>Contradicted by the reference</h5>
+                <p>
+                  The guide tells a reader to type
+                  <code>--fast-mode</code>, which is a setting you add to a
+                  command to change how it behaves. The reference says that
+                  setting was taken out in version 2.0. Anyone following the
+                  guide would get an error.
+                </p>
+              </div>
+            </div>
+<pre class="terminal-lite"><span class="f">Contradicted by the reference (1)</span>
+<span class="c">------------------------------</span>
+  1. [unsupported_used] the draft presents the flag <span class="f">"--fast-mode"</span>
+     as usable, but the reference says it is not
+
+<span class="dim">exit 1 — findings, so a CI check would fail here</span></pre>
+          </li>
+        </ol>
+      </div>
+
+      <!-- ── pane: corrected ────────────────────────────────── -->
+      <div class="pane pane-fixed">
+        <ol class="steps">
+          <li class="step">
+            <div class="step-head">
+              <span class="step-n">1</span>
+              <div>
+                <h4>The official reference</h4>
+                <p>Unchanged — the same source of truth.</p>
+              </div>
+            </div>
+            <blockquote class="quote">
+              Version 2.0 removed the <code>--fast-mode</code> option. Use
+              <code>--threads</code> instead.
+            </blockquote>
+          </li>
+
+          <li class="step">
+            <div class="step-head">
+              <span class="step-n">2</span>
+              <div>
+                <h4>The draft guide, corrected</h4>
+                <p>The writer has used the setting that still exists.</p>
+              </div>
+            </div>
+            <blockquote class="quote">
+              Run <code>app build --threads 4</code> for better performance.
+            </blockquote>
+          </li>
+
+          <li class="step">
+            <div class="step-head">
+              <span class="step-n">3</span>
+              <div>
+                <h4>What DocFacts reports</h4>
+                <p>Nothing to flag in this example.</p>
+              </div>
+            </div>
+            <div class="verdict ok">
+              <svg width="19" height="19" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <circle cx="8" cy="8" r="6.4" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M5.4 8.2l1.9 1.9 3.4-4" stroke="currentColor" stroke-width="1.6"
+                      stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <div>
+                <h5>No findings in this example</h5>
+                <p>
+                  Every technical detail the guide mentions appears in the
+                  reference. That is not a promise the page is
+                  <em>correct</em> — only that nothing in it contradicted
+                  this reference in the ways DocFacts checks.
+                </p>
+              </div>
+            </div>
+<pre class="terminal-lite"><span class="c">Contradicted by the reference (0)</span>
+<span class="c">------------------------------</span>
+  Nothing in the draft contradicts the reference in the ways checked.
+
+<span class="dim">exit 0 — a CI check would pass</span></pre>
+          </li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="callout">
+      <p>
+        <strong>This is a worked example, not a live checker.</strong> Both
+        outcomes above are prepared in advance, from real
+        <code>docfacts&nbsp;0.1.0</code> output on those documents. Nothing
+        runs in your browser and nothing is sent anywhere — the page has no
+        JavaScript at all. Two small examples also say nothing about how
+        accurate the tool is on your documentation; the
+        <a href="#limits">limitations</a> are worth reading before you rely
+        on it.
+      </p>
+    </div>
+  </div>
+</section>
+
 
 <!-- ── demonstration ─────────────────────────────────────────── -->
 <section id="demo">
