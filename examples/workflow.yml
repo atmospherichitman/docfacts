@@ -24,4 +24,4 @@ jobs:
         with:
           reference: docs/api-spec.md
           draft: docs/getting-started.md
-          fail-on-findings: false
+          fail-on-findings: "false"

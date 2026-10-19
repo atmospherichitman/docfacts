@@ -75,9 +75,14 @@ jobs:
         with:
           reference: docs/api-spec.md
           draft: docs/guide.md
-          # version: "0.1.0"        # pinned by default
+          # tool: forge             # if the documented command is not inferred
+          # version: "0.1.0"        # the npm version to run; pinned by default
           # fail-on-findings: "false"   # report without blocking
 ```
+
+`@v0.1.0` never moves. `@v0` follows the latest compatible release, which
+gets you fixes without an edit and means the code you run can change without
+one. Pick whichever of those you prefer; a commit SHA is stricter than both.
 
 Three things about this are deliberate, and worth keeping if you adapt it:
 

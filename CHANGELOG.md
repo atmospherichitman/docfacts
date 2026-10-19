@@ -6,7 +6,27 @@ uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Fixed — GitHub Action could not run on a GitHub runner
+Nothing yet.
+
+## [0.1.0] — 2026-10-19
+
+First release.
+
+The CLI is published on npm as [`docfacts@0.1.0`](https://www.npmjs.com/package/docfacts),
+published 2026-10-19. The GitHub Action is released at tag `v0.1.0` from this
+commit. `npm run build` here reproduces the published `dist/` byte for byte,
+so the tag and the package are the same software.
+
+Both GitHub-hosted workflows pass on this commit: the unit suite across
+Ubuntu, Windows and macOS on Node 20 and 22, and an integration workflow that
+runs the Action itself on a runner.
+
+**If you referenced this Action by branch rather than by tag before
+2026-10-19, take the tagged version.** The Action was corrected twice after
+the package was published, as recorded below. Neither correction touched the
+CLI, and the published npm package was never affected.
+
+### GitHub Action — fixed: could not run on a GitHub runner
 
 The Action invoked the CLI with `npx docfacts@<version>`, which failed on
 ubuntu runners with `sh: 1: docfacts: not found` and exit 127. `npx`
@@ -37,7 +57,7 @@ nothing.
 
 No change to the CLI or the published package.
 
-### Security — GitHub Action
+### GitHub Action — security: script injection and three fail-open bugs
 
 The GitHub Action in this repository was unsafe as first committed, and is
 rewritten. **If you copied `action.yml` or referenced this action by branch
@@ -83,10 +103,6 @@ The action's safe-usage requirements — `pull_request` rather than
 `pull_request_target`, and `permissions: contents: read` — are documented in
 the README and `SECURITY.md`. A dependency-free test suite now asserts these
 properties on every pull request to this repository.
-
-## [0.1.0] — unreleased
-
-First release candidate. **Not yet published to npm.**
 
 ### Added
 

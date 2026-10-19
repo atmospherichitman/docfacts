@@ -42,6 +42,30 @@ regression tests.
 The synthetic suite had found none of them. That is worth knowing when
 weighing any claim made from synthetic tests, including the ones here.
 
+### As a GitHub Action
+
+Released at `v0.1.0` from this repository, so a documentation pull request
+gets checked where the problem happens:
+
+```yaml
+- uses: actions/checkout@v4
+- uses: atmospherichitman/docfacts@v0.1.0
+  with:
+    reference: docs/api-spec.md
+    draft: docs/guide.md
+    fail-on-findings: "false"   # start non-blocking
+```
+
+Run it on `pull_request` with `permissions: contents: read` — never
+`pull_request_target`, which hands a pull request's own code a write-capable
+token and your secrets. The Action reads two files and writes its report
+outside your checkout; it asks for nothing else.
+
+Exit codes are `0` clean, `1` findings, `2` an input or environment failure.
+`fail-on-findings: "false"` silences findings and nothing else: a missing
+file, a bad install, or a report it cannot parse still fails the job. A check
+that cannot run should say so rather than report that everything is fine.
+
 ### Honest status
 
 No published accuracy rate, because there isn't one worth quoting from six
