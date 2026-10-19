@@ -13,6 +13,11 @@ npm install -g docfacts
 docfacts --reference ./upgrade-notes.md --draft ./guide.md
 ```
 
+New here? The [five-minute tutorial](docs/tutorial.md) walks through one
+real example — a migration guide telling people to use a flag that was
+removed — including the finding it catches and the one it misses. There is
+also a [website](https://atmospherichitman.github.io/docfacts/).
+
 ## What problem this solves
 
 You have a specification, a changelog or a config reference. Someone — a
