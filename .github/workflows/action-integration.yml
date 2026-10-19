@@ -1,0 +1,170 @@
+# Runs the composite Action itself, on a real runner, against fixed fixtures.
+#
+# The unit tests in `test/action.test.ts` read action.yml and assert its
+# shape. A development-repository suite extracts the shell and executes it
+# against a stubbed CLI. Neither one runs the thing GitHub actually runs:
+# `uses: ./`, with GitHub performing its own expression substitution, its own
+# composite-step machinery, and a real `npx` install. That gap is what this
+# workflow closes, and it is the gap an earlier injection bug lived in.
+#
+# Everything here is synthetic and local. No secrets, no customer documents,
+# no network beyond the npm install the Action does itself, and read-only
+# permissions.
+name: Action integration
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Read-only, and `pull_request` rather than `pull_request_target`. The latter
+# would hand a pull request's own code a write-capable token and the
+# repository's secrets, which is precisely what this Action's own SECURITY.md
+# tells users never to do.
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    name: Composite action on a real runner
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── 1. a clean document succeeds with no findings ────────────────
+      - name: Clean document
+        id: clean
+        uses: ./
+        with:
+          reference: .github/fixtures/reference.md
+          draft: .github/fixtures/clean.md
+          # Explicit, to prove the input is honoured rather than ignored.
+          version: "0.1.0"
+
+      - name: Assert clean succeeded with zero findings
+        env:
+          OUTCOME: ${{ steps.clean.outcome }}
+          FINDINGS: ${{ steps.clean.outputs.findings }}
+          REPORT: ${{ steps.clean.outputs.report }}
+        run: |
+          set -euo pipefail
+          [ "$OUTCOME" = "success" ] || { echo "expected success, got '$OUTCOME'"; exit 1; }
+          [ "$FINDINGS" = "0" ] || { echo "expected 0 findings, got '$FINDINGS'"; exit 1; }
+          [ -f "$REPORT" ] || { echo "the report output does not point at a file: '$REPORT'"; exit 1; }
+          echo "clean: success, 0 findings, report at $REPORT"
+
+      # ── 2. a removed flag is found, and fails the step ───────────────
+      #
+      # The fixture draft tells people to pass `--legacy-cache`; the
+      # reference says it was removed in 2.0. docfacts reports that as
+      # `unsupported_used` at `confirmed` confidence — the reference does not
+      # merely omit the flag, it contradicts the draft.
+      - name: Removed flag, blocking
+        id: blocking
+        uses: ./
+        continue-on-error: true # so the assertion below runs, not the job dying
+        with:
+          reference: .github/fixtures/reference.md
+          draft: .github/fixtures/removed-flag.md
+          fail-on-findings: "true"
+
+      - name: Assert findings failed the step
+        env:
+          OUTCOME: ${{ steps.blocking.outcome }}
+          FINDINGS: ${{ steps.blocking.outputs.findings }}
+        run: |
+          set -euo pipefail
+          [ "$OUTCOME" = "failure" ] || { echo "expected failure, got '$OUTCOME'"; exit 1; }
+          case "$FINDINGS" in
+            ''|*[!0-9]*) echo "findings output is not a number: '$FINDINGS'"; exit 1 ;;
+          esac
+          [ "$FINDINGS" -gt 0 ] || { echo "expected findings, got '$FINDINGS'"; exit 1; }
+          echo "blocking: failed as intended with $FINDINGS finding(s)"
+
+      # ── 3. the same document, reported without blocking ──────────────
+      - name: Removed flag, non-blocking
+        id: tolerant
+        uses: ./
+        with:
+          reference: .github/fixtures/reference.md
+          draft: .github/fixtures/removed-flag.md
+          fail-on-findings: "false"
+
+      - name: Assert findings were reported without failing
+        env:
+          OUTCOME: ${{ steps.tolerant.outcome }}
+          FINDINGS: ${{ steps.tolerant.outputs.findings }}
+          BLOCKING_FINDINGS: ${{ steps.blocking.outputs.findings }}
+        run: |
+          set -euo pipefail
+          [ "$OUTCOME" = "success" ] || { echo "expected success, got '$OUTCOME'"; exit 1; }
+          [ "$FINDINGS" -gt 0 ] || { echo "expected findings, got '$FINDINGS'"; exit 1; }
+          # The setting must change whether the step fails, not what it found.
+          [ "$FINDINGS" = "$BLOCKING_FINDINGS" ] || {
+            echo "fail-on-findings changed the count: $FINDINGS vs $BLOCKING_FINDINGS"
+            exit 1
+          }
+          echo "non-blocking: succeeded while reporting $FINDINGS finding(s)"
+
+      # ── 4. a missing file fails whatever fail-on-findings says ───────
+      #
+      # The regression that matters most. An earlier version of this Action
+      # discarded the CLI's exit code with `|| true`, so a missing file
+      # reported "0 findings" and a green check. Silencing findings must
+      # never silence a run that did not happen.
+      - name: Missing file, blocking
+        id: missing_blocking
+        uses: ./
+        continue-on-error: true
+        with:
+          reference: .github/fixtures/reference.md
+          draft: .github/fixtures/does-not-exist.md
+          fail-on-findings: "true"
+
+      - name: Missing file, non-blocking
+        id: missing_tolerant
+        uses: ./
+        continue-on-error: true
+        with:
+          reference: .github/fixtures/does-not-exist.md
+          draft: .github/fixtures/clean.md
+          fail-on-findings: "false"
+
+      - name: Assert a missing file fails either way, and reports no count
+        env:
+          BLOCKING: ${{ steps.missing_blocking.outcome }}
+          TOLERANT: ${{ steps.missing_tolerant.outcome }}
+          BLOCKING_FINDINGS: ${{ steps.missing_blocking.outputs.findings }}
+          TOLERANT_FINDINGS: ${{ steps.missing_tolerant.outputs.findings }}
+        run: |
+          set -euo pipefail
+          [ "$BLOCKING" = "failure" ] || { echo "missing draft did not fail: '$BLOCKING'"; exit 1; }
+          [ "$TOLERANT" = "failure" ] || {
+            echo "missing reference did not fail with fail-on-findings=false: '$TOLERANT'"
+            exit 1
+          }
+          # Fail closed: a run that never happened must report no count at
+          # all, rather than the zero that would read as "all clear".
+          [ -z "$BLOCKING_FINDINGS" ] || { echo "reported a count for a failed run: '$BLOCKING_FINDINGS'"; exit 1; }
+          [ -z "$TOLERANT_FINDINGS" ] || { echo "reported a count for a failed run: '$TOLERANT_FINDINGS'"; exit 1; }
+          echo "missing files: failed under both settings, with no findings count"
+
+      # ── 5. the Action leaves the checkout alone ──────────────────────
+      - name: Assert nothing was written into the checkout
+        run: |
+          set -euo pipefail
+          # The report belongs in RUNNER_TEMP. An earlier version wrote
+          # docfacts.json into the working directory, where a later step
+          # could commit it.
+          if [ -e docfacts.json ]; then
+            echo "the action wrote docfacts.json into the checkout"
+            exit 1
+          fi
+          dirty=$(git status --porcelain)
+          if [ -n "$dirty" ]; then
+            echo "the checkout is not clean after five runs:"
+            echo "$dirty"
+            exit 1
+          fi
+          echo "checkout clean"
