@@ -6,6 +6,37 @@ uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed — GitHub Action could not run on a GitHub runner
+
+The Action invoked the CLI with `npx docfacts@<version>`, which failed on
+ubuntu runners with `sh: 1: docfacts: not found` and exit 127. `npx`
+installs a package and then asks a shell to run a *command named after it*,
+so the run depended on a bin link existing, on `PATH`, on the executable
+bit, on the shebang, and on `npx` not deciding that some local package
+already satisfied the spec — which matters here, because the Action is
+normally run inside a checkout, and for this repository that checkout is
+itself a package named `docfacts`.
+
+None of that indirection is necessary. The Action now installs the pinned
+version into a directory of its own under `$RUNNER_TEMP`, with its own
+project root so npm cannot resolve against the checkout, reads the entry
+point from the installed package's `bin` metadata, verifies the installed
+version matches the pin, and runs it with `node`. There is no command
+lookup left to fail.
+
+The failure also produced no diagnosis, so each way this can go wrong now
+reports what is actually wrong: the install failing, the installed package
+declaring no `docfacts` command, the declared command being absent from the
+package, or npm installing a different version than the one pinned. Exit
+127 is explicitly an environment failure and never a clean result.
+
+The install also runs with `--ignore-scripts`. Nothing fetched from a
+registry should run lifecycle code on a runner holding a checkout and a
+token; docfacts declares no scripts and no dependencies, so this costs
+nothing.
+
+No change to the CLI or the published package.
+
 ### Security — GitHub Action
 
 The GitHub Action in this repository was unsafe as first committed, and is

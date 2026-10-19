@@ -75,6 +75,20 @@ beforeAll(() => {
 /** The inputs the action declares, as a list of names. */
 const inputNames = (): string[] => Object.keys(action.inputs ?? {});
 
+/**
+ * The run block with shell comments removed.
+ *
+ * Several assertions below are about what the script *does*, and the script
+ * documents what it used to do — it names `npx` in a comment explaining why
+ * it no longer calls it. Matching the raw text made "does not use npx" fail
+ * on its own explanation.
+ */
+const executable = (): string =>
+  runScript
+    .split("\n")
+    .filter((line) => !line.trimStart().startsWith("#"))
+    .join("\n");
+
 describe("no workflow input reaches the shell as source text", () => {
   it("has no ${{ }} expression anywhere in the run block", () => {
     // The whole vulnerability in one assertion. GitHub substitutes these as
@@ -129,7 +143,7 @@ describe("the run cannot fail open", () => {
   it("never discards an exit code with || true", () => {
     // `|| true` after the CLI turned exit 2 — a missing file — into a green
     // check reporting zero findings.
-    expect(runScript).not.toMatch(/\|\|\s*true/);
+    expect(executable()).not.toMatch(/\|\|\s*true/);
   });
 
   it("never swallows an error into a default count", () => {
@@ -174,8 +188,54 @@ describe("nothing is written into the checkout", () => {
 });
 
 describe("the CLI runs once, at a pinned version", () => {
-  it("invokes npx exactly once", () => {
-    expect(runScript.match(/npx\s+--yes/g) ?? []).toHaveLength(1);
+  it("does not use npx at all", () => {
+    // The regression this guards. `npx <pkg>` installs a package and then
+    // asks a shell to run a *command named after it*, so the run depends on
+    // a bin link, on PATH, on the exec bit, on the shebang, and on npx not
+    // deciding that some local package already satisfies the spec — which
+    // matters most here, because this action is usually run inside a
+    // checkout, and for this repository that checkout is itself named
+    // `docfacts`. On a GitHub runner it failed with
+    // `sh: 1: docfacts: not found` and exit 127.
+    expect(executable()).not.toMatch(/\bnpx\b/);
+  });
+
+  it("installs once and runs the resolved entry point with node", () => {
+    expect(executable().match(/npm install/g) ?? []).toHaveLength(1);
+    expect(runScript).toMatch(/node "\$entry"/);
+  });
+
+  it("installs into RUNNER_TEMP, not the checkout", () => {
+    expect(runScript).toMatch(/install_dir="\$\{RUNNER_TEMP\}/);
+    expect(runScript).toMatch(/--prefix "\$install_dir"/);
+  });
+
+  it("gives the install its own project root", () => {
+    // Otherwise npm walks up into the checkout's package.json, which for
+    // this repository is a package also called docfacts — the ambiguity
+    // that made the original invocation unreliable.
+    expect(runScript).toMatch(/docfacts-action-install/);
+  });
+
+  it("does not let an installed package run lifecycle scripts", () => {
+    expect(runScript).toMatch(/--ignore-scripts/);
+  });
+
+  it("resolves the command from the installed package's own metadata", () => {
+    // Rather than assuming an internal path. This is also what makes the
+    // action able to say *why* a command is missing.
+    expect(runScript).toMatch(/bin\.docfacts|bin && typeof bin === 'object' \? bin\.docfacts/);
+    expect(runScript).toMatch(/declares no "docfacts" command/);
+    expect(runScript).toMatch(/which is not present in the installed package/);
+  });
+
+  it("checks that what installed is what was pinned", () => {
+    expect(runScript).toMatch(/was pinned/);
+  });
+
+  it("treats exit 127 as an environment failure, never a clean result", () => {
+    expect(runScript).toMatch(/127\)/);
+    expect(runScript).toMatch(/not a clean result/);
   });
 
   it("takes the version from the input rather than following the latest release", () => {

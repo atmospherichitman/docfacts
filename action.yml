@@ -145,39 +145,154 @@ runs:
 
         # ── run the CLI once ────────────────────────────────────────────
         #
-        # Once, not twice. The earlier version ran it twice -- human-readable
+        # Once, not twice. An earlier version ran it twice -- human-readable
         # for the log, JSON for the count -- which doubled the work and made
         # the two runs able to disagree. The JSON carries everything, so the
         # log digest is rendered from the report instead.
         #
-        # The report goes to RUNNER_TEMP, never the checkout: a file written
-        # into the working directory can be committed by a later step or
-        # picked up by a dirty-tree check.
+        # Everything written goes to RUNNER_TEMP, never the checkout: a file
+        # written into the working directory can be committed by a later step
+        # or picked up by a dirty-tree check.
         report="${RUNNER_TEMP}/docfacts-report.json"
         digest="${RUNNER_TEMP}/docfacts-digest.md"
         counter="${RUNNER_TEMP}/docfacts-count.cjs"
+        resolver="${RUNNER_TEMP}/docfacts-resolve.cjs"
+        install_dir="${RUNNER_TEMP}/docfacts-install"
+        install_log="${RUNNER_TEMP}/docfacts-install.log"
 
         args=(--reference "$DF_REFERENCE" --draft "$DF_DRAFT" --json)
         if [ -n "${DF_TOOL:-}" ]; then
           args+=(--tool "$DF_TOOL")
         fi
 
+        # ── install the pinned version, then call it by path ────────────
+        #
+        # This used to be `npx --yes docfacts@VERSION`, and on a GitHub
+        # runner that failed with `sh: 1: docfacts: not found` and exit 127.
+        # npx installs a package and then asks a shell to run a *command
+        # named after it*, so the run depends on a bin link existing, on PATH
+        # being right, on the file being executable, on its shebang, and on
+        # npx not deciding some local package already satisfies the spec --
+        # which matters here, because this action is often run inside a
+        # checkout of a repository that is itself named `docfacts`.
+        #
+        # None of that is needed. Installing into a directory of our own and
+        # running the entry point with `node` removes every one of those
+        # failure modes: no command lookup, no bin link, no shebang, no
+        # ambient resolution. A missing package then fails as a missing
+        # package, and says so.
+        mkdir -p "$install_dir"
+
+        # An isolated project root. Without this, npm walks up and finds the
+        # checkout's own package.json -- which, for this repository, is a
+        # package named `docfacts`, and that ambiguity is exactly what the
+        # change above is removing.
+        printf '%s\n' '{ "name": "docfacts-action-install", "private": true }' \
+          > "${install_dir}/package.json"
+
+        # --ignore-scripts because nothing fetched from a registry should run
+        # lifecycle code on a runner that has a checkout and a token in it.
+        # docfacts declares no scripts and no dependencies, so this costs
+        # nothing and removes a class of supply-chain risk.
+        if ! npm install \
+              --prefix "$install_dir" \
+              --no-save --no-audit --no-fund --ignore-scripts \
+              --loglevel=error \
+              "docfacts@${DF_VERSION}" > "$install_log" 2>&1; then
+          echo "--- npm output ---"
+          # Guarded with a test rather than `|| true`: discarding an exit
+          # code is the habit that produced the fail-open bugs above, and it
+          # is not worth reintroducing even to print an error.
+          if [ -f "$install_log" ]; then
+            cat "$install_log"
+          fi
+          echo "------------------"
+          usage_error "could not install docfacts@${DF_VERSION}. See the npm output above."
+        fi
+
+        # Resolve the entry point from the installed package's own metadata,
+        # and confirm the command this action promises actually exists in the
+        # version that was installed.
+        #
+        # Reading `bin` rather than hard-coding `dist/docverify.js` means the
+        # action checks the package's own promise instead of assuming an
+        # internal layout, and says precisely what is wrong when the promise
+        # is not kept. The original failure -- a command that could not be
+        # found -- produced no diagnosis at all.
+        cat > "$resolver" <<'RESOLVE'
+        'use strict';
+        const fs = require('node:fs');
+        const path = require('node:path');
+
+        function fail(message) {
+          process.stderr.write('docfacts-action: ' + message + '\n');
+          process.exit(2);
+        }
+
+        const installDir = process.env.DF_INSTALL_DIR;
+        const expected = process.env.DF_VERSION;
+        if (!installDir) fail('internal error: DF_INSTALL_DIR was not set.');
+
+        const packageDir = path.join(installDir, 'node_modules', 'docfacts');
+        const manifestPath = path.join(packageDir, 'package.json');
+
+        let manifest;
+        try {
+          manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+        } catch (err) {
+          fail('the installed package has no readable package.json at ' + manifestPath + ' (' + err.code + ').');
+        }
+
+        // The pin is only real if what landed is what was asked for.
+        if (manifest.version !== expected) {
+          fail('installed docfacts@' + manifest.version + ' when docfacts@' + expected + ' was pinned.');
+        }
+
+        // `bin` may be a string (one command, named after the package) or a
+        // map. Either form must yield a `docfacts` command.
+        const bin = manifest.bin;
+        const relative =
+          typeof bin === 'string' ? bin : bin && typeof bin === 'object' ? bin.docfacts : undefined;
+
+        if (typeof relative !== 'string' || relative === '') {
+          fail(
+            'docfacts@' + expected + ' declares no "docfacts" command. Its bin is ' +
+              JSON.stringify(bin) + '.',
+          );
+        }
+
+        const entry = path.join(packageDir, relative);
+        if (!fs.existsSync(entry)) {
+          fail(
+            'docfacts@' + expected + ' declares "docfacts" as ' + relative +
+              ', which is not present in the installed package.',
+          );
+        }
+
+        process.stdout.write(entry);
+        RESOLVE
+
+        if ! entry=$(DF_INSTALL_DIR="$install_dir" node "$resolver"); then
+          usage_error "docfacts@${DF_VERSION} installed but does not provide a usable entry point; see the log above."
+        fi
+
         # The exit code is captured, not discarded. `set +e` around just this
         # call, because exit 1 is a legitimate result here and `set -e` would
         # abort on it before it could be interpreted.
         set +e
-        npx --yes "docfacts@${DF_VERSION}" "${args[@]}" > "$report"
+        node "$entry" "${args[@]}" > "$report"
         cli_status=$?
         set -e
 
         # 0 = clean, 1 = findings, 2 = input or usage error. Anything else
-        # means something other than the CLI decided the outcome -- npx could
-        # not fetch the package, the runner killed it, a signal. None of those
-        # are "no findings".
+        # means something other than the CLI decided the outcome -- the
+        # runner killed it, a signal, a crash. None of those are "no
+        # findings", and 127 in particular must never read as a clean run.
         case "$cli_status" in
           0|1) ;;
           2) usage_error "docfacts@${DF_VERSION} rejected its input (exit 2). Check the reference and draft paths." ;;
-          *) usage_error "docfacts@${DF_VERSION} exited with status $cli_status, which is neither a result nor a usage error. The package may not have installed." ;;
+          127) usage_error "docfacts@${DF_VERSION} could not be executed (exit 127). This is an installation or environment failure, not a clean result." ;;
+          *) usage_error "docfacts@${DF_VERSION} exited with status $cli_status, which is neither a result nor a usage error." ;;
         esac
 
         # ── interpret the report, failing closed ────────────────────────
@@ -230,8 +345,9 @@ runs:
         }
 
         // The pinned version is only a real pin if the thing that ran is
-        // actually that version. npx resolving to something else -- a cached
-        // copy, a redirected registry -- would otherwise go unnoticed.
+        // actually that version. The resolver already checks the installed
+        // manifest; this checks the report the run produced, so a cached
+        // copy or a redirected registry cannot slip past both.
         if (data.version !== expected) {
           fail('version mismatch: pinned docfacts@' + expected + ' but the report was produced by ' + data.version + '.');
         }

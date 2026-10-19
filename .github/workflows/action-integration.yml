@@ -32,6 +32,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Node is preinstalled on the runner image, so this is not strictly
+      # required — but pinning it means the Action is exercised against a
+      # known Node and npm rather than whatever the image happens to ship
+      # this week. The Action itself deliberately does not do this: imposing
+      # a Node version on a consumer's workflow is not its business.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # If this job ever fails in the install step again, these three lines
+      # are the difference between a diagnosis and a guess.
+      - name: Record the environment
+        run: |
+          set -euo pipefail
+          echo "node $(node --version), npm $(npm --version), sh -> $(readlink -f /bin/sh)"
+
       # ── 1. a clean document succeeds with no findings ────────────────
       - name: Clean document
         id: clean
