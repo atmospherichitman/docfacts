@@ -18,6 +18,25 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import fs from "node:fs";
 import { check } from "../src/check.js";
+import { normaliseText } from "../src/docverify.js";
+
+/**
+ * Read the tutorial the way the CLI reads a document.
+ *
+ * `normaliseText` is what `docfacts` applies to every file it is given —
+ * it strips a byte-order mark and converts CRLF to LF before anything looks
+ * at the text. Using it here is not a convenience for the extraction
+ * patterns below; it is the difference between testing what the tool does
+ * and testing what it would do if nobody ever checked out the repository on
+ * Windows.
+ *
+ * The first version of this file read the bytes raw. The fences are
+ * ` ````markdown ` followed by a newline, and on a Windows checkout that
+ * newline is CRLF, so the pattern matched nothing, found no documents, and
+ * failed on both Windows jobs while Ubuntu and macOS passed. The tutorial
+ * was never the problem.
+ */
+const readTutorial = (file: string): string => normaliseText(fs.readFileSync(file, "utf-8"));
 
 const TUTORIAL = ["docs/tutorial.md", "packages/docfacts/docs/tutorial.md"].find((p) =>
   fs.existsSync(p),
@@ -29,7 +48,7 @@ let draftFixed: string;
 
 beforeAll(() => {
   expect(TUTORIAL, "docs/tutorial.md not found").toBeDefined();
-  const text = fs.readFileSync(TUTORIAL as string, "utf-8");
+  const text = readTutorial(TUTORIAL as string);
 
   // The documents a reader is told to create are the ````markdown blocks.
   // Four-tick fences, because the documents themselves contain fenced code.
@@ -89,7 +108,7 @@ describe("the documents the tutorial asks you to create", () => {
 describe("what the tutorial quotes", () => {
   let text: string;
   beforeAll(() => {
-    text = fs.readFileSync(TUTORIAL as string, "utf-8");
+    text = readTutorial(TUTORIAL as string);
   });
 
   it("quotes finding text the checker actually produces", () => {
@@ -126,5 +145,85 @@ describe("what the tutorial quotes", () => {
     ]) {
       expect(text, `overclaim: ${overclaim}`).not.toMatch(overclaim);
     }
+  });
+});
+
+/**
+ * Extraction, which is where this file broke.
+ *
+ * The documents are pulled out of the tutorial by pattern. A pattern that
+ * assumes LF finds nothing on a Windows checkout — `core.autocrlf` is true
+ * there by default — and "found nothing" is indistinguishable from "the
+ * tutorial has no documents" unless something asserts the difference.
+ *
+ * These run the extraction over the same text spelled both ways, so the
+ * failure cannot come back quietly.
+ */
+describe("extracting the documents", () => {
+  /** Exactly the extraction the suite above performs. */
+  const extract = (markdown: string): string[] =>
+    [...normaliseText(markdown).matchAll(/````markdown\n([\s\S]*?)\n````/g)].map((m) => m[1]);
+
+  const sample = [
+    "# Tutorial",
+    "",
+    "````markdown",
+    "# Reference",
+    "",
+    "```bash",
+    "tool run",
+    "```",
+    "````",
+    "",
+    "Some prose.",
+    "",
+    "````markdown",
+    "# Draft",
+    "````",
+  ].join("\n");
+
+  it("finds the same documents whether the file uses LF or CRLF", () => {
+    const lf = extract(sample);
+    const crlf = extract(sample.replace(/\n/g, "\r\n"));
+    const cr = extract(sample.replace(/\n/g, "\r"));
+
+    expect(lf).toHaveLength(2);
+    expect(crlf, "CRLF produced different documents from LF").toEqual(lf);
+    expect(cr, "lone CR produced different documents from LF").toEqual(lf);
+  });
+
+  it("keeps the inner ``` fences, which is why the outer ones are ````", () => {
+    const [reference] = extract(sample);
+    expect(reference).toContain("```bash");
+    expect(reference).toContain("tool run");
+  });
+
+  it("returns no carriage return inside an extracted document", () => {
+    // Otherwise the documents handed to check() would differ by platform,
+    // and the findings asserted above could differ with them.
+    for (const document of extract(sample.replace(/\n/g, "\r\n"))) {
+      expect(document).not.toMatch(/\r/);
+    }
+  });
+
+  it("extracts nothing from a tutorial with no document blocks", () => {
+    // The failure that started this: zero documents must be distinguishable
+    // from a parsing accident, which is what the length assertion is for.
+    expect(extract("# Tutorial\n\nNo examples here.\n")).toEqual([]);
+    expect(extract("")).toEqual([]);
+  });
+
+  it("extracts nothing from an unterminated block", () => {
+    expect(extract("````markdown\n# Reference\n\nnever closed\n")).toEqual([]);
+  });
+
+  it("does not mistake a plain ``` block for a document", () => {
+    // Quoted output is fenced with three backticks and must not be read as
+    // a document a reader is told to create.
+    expect(extract("```\nContradicted by the reference (0)\n```\n")).toEqual([]);
+  });
+
+  it("fails loudly rather than silently if the tutorial is missing", () => {
+    expect(() => readTutorial("docs/no-such-tutorial.md")).toThrow();
   });
 });
